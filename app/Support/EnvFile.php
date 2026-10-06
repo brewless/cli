@@ -16,6 +16,9 @@ use SensitiveParameter;
  */
 final class EnvFile
 {
+    /** What is stored for an environment without variables: a version cannot be empty. */
+    public const string NONE = "# no variables\n";
+
     private const string HEADER = '/^# brewless: revision (\d+)[^\n]*\n/';
 
     public static function path(string $directory, string $environment, ?string $file): string

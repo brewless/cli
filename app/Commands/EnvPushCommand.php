@@ -36,6 +36,11 @@ final class EnvPushCommand extends Command
 
             $local = (string) file_get_contents($path);
             $content = EnvFile::withoutHeader($local);
+
+            // Scaleway does not take an empty version, so "no variables" is said in a comment.
+            if (trim($content) === '') {
+                $content = EnvFile::NONE;
+            }
             $names = EnvFile::names($content);
 
             $state = $api->get('/api/environments/'.$environment['id'].'/secrets')['data'] ?? [];

@@ -150,6 +150,19 @@ test('an unchanged file pushes nothing', function (): void {
     expect(pushedToBrewless())->toBeNull();
 });
 
+test('an empty file removes every variable and is stored as a comment, because a version cannot be empty', function (): void {
+    vault(['revision' => 7, 'content' => "API_KEY=x\n"], next: 8);
+    file_put_contents($this->project.'/.env.production', "# brewless: revision 7 of shop-production-env.\n");
+
+    $this->artisan('env:push', ['environment' => 'production', '--force' => true])
+        ->expectsOutputToContain('Pushed revision 8 (0 variables)')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/secrets/s1/versions') && base64_decode($request['data'], true) === "# no variables\n");
+
+    expect(pushedToBrewless()?->data()['keys'])->toBe([]);
+});
+
 test('a file that is no dotenv file, a missing file and a missing scaleway key are each said plainly', function (): void {
     vault(null);
 
