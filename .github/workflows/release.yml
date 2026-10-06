@@ -1,0 +1,30 @@
+name: Release
+
+# A tag v1.2.3 builds the phar with that version and attaches it to a release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  phar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          ini-values: phar.readonly=0
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: vendor/bin/pest
+      - run: php brewless app:build brewless --build-version="${GITHUB_REF_NAME#v}" --no-interaction
+      - run: |
+          cd builds
+          sha256sum brewless > brewless.sha256
+          ./brewless --version
+      - run: gh release create "$GITHUB_REF_NAME" builds/brewless builds/brewless.sha256 --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md."
+        env:
+          GH_TOKEN: ${{ github.token }}
