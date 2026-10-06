@@ -1,0 +1,58 @@
+{
+    "name": "brewless/cli",
+    "description": "The command line client of Brewless: sign in, connect a project and deploy it to your own European cloud account.",
+    "keywords": [
+        "brewless",
+        "cli",
+        "deploy",
+        "serverless",
+        "php",
+        "laravel"
+    ],
+    "homepage": "https://brewless.eu",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Coding Agency",
+            "homepage": "https://coding.agency"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/http": "^13.0",
+        "laravel-zero/foundation": "^13.23",
+        "laravel-zero/framework": "^13.0",
+        "symfony/yaml": "^8.1"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.30.4",
+        "mockery/mockery": "^1.6.12",
+        "pestphp/pest": "^4.7.8 || ^5.0.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Database\\Factories\\": "database/factories/",
+            "Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "bin": [
+        "brewless"
+    ]
+}
