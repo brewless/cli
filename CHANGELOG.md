@@ -15,3 +15,4 @@ First version.
 - `command`, `logs`: run one console command in an environment, and read or follow its logs.
 - `domain:add`: make an environment answer on a domain of your own, with a certificate.
 - `scale`: set between how many replicas your provider scales an environment.
+- `provision`: make what a new environment needs in your own cloud accounts.

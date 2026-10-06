@@ -7,6 +7,7 @@ deploys it to your own cloud account.
 ```bash
 brewless login acme          # sign in; you approve it in the console
 brewless init                # writes brewless.yml (no secrets) for this project
+brewless provision production # makes the containers, database and edge in your own accounts
 brewless deploy production   # build the current commit and put it live
 brewless releases production # what was deployed
 brewless rollback production # put the previous release back
