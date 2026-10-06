@@ -20,6 +20,7 @@ trait FollowsReleases
         'migrate' => 'Release commands',
         'activate' => 'Web container live and healthy',
         'workers' => 'Workers and schedule',
+        'attach_assets' => 'Built files served from your storage zone',
     ];
 
     private const array OVER = ['active', 'superseded', 'failed', 'cancelled'];
@@ -39,6 +40,13 @@ trait FollowsReleases
                 $status = (string) ($step['status'] ?? '');
 
                 if (($printed[$name] ?? null) === $status || ! in_array($status, ['succeeded', 'failed'], true)) {
+                    continue;
+                }
+
+                // Housekeeping around the switch that is only worth a line when it fails.
+                if ($name === 'detach_assets' && $status === 'succeeded') {
+                    $printed[$name] = $status;
+
                     continue;
                 }
 
