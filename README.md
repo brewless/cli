@@ -11,6 +11,8 @@ brewless provision production # makes the containers, database and edge in your 
 brewless deploy production   # build the current commit and put it live
 brewless releases production # what was deployed
 brewless rollback production # put the previous release back
+brewless export production   # everything Brewless knows, as a folder with Terraform
+brewless detach production   # Brewless stops managing it; it keeps running
 ```
 
 ## What happens on a deploy
