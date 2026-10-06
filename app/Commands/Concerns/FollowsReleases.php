@@ -43,7 +43,10 @@ trait FollowsReleases
                 }
 
                 $printed[$name] = $status;
-                $label = self::STEP_LABELS[$name] ?? $name;
+                // A rollback builds nothing: its image step only checks the registry.
+                $label = $name === 'image' && ($release['source'] ?? '') === 'rollback'
+                    ? 'Image still in your registry'
+                    : (self::STEP_LABELS[$name] ?? $name);
                 $elapsed = sprintf('%3ds', (int) (microtime(true) - $started));
 
                 $status === 'succeeded'
