@@ -4,6 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.2.0 (2026-10-07)
+
+- Once a day the client says when a newer version exists and offers to install it. Silent in a pipeline or a pipe; `BREWLESS_NO_UPDATE_CHECK=1` turns it off.
+- `init` adds the environments, asks what they need and sets them up.
+
 ## 0.1.1 (2026-10-07)
 
 - Installable with Composer, globally or in a project: `composer global require brewless/cli`. The package holds the built client and requires only PHP.

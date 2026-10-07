@@ -28,7 +28,14 @@ vendor/bin/brewless list
 The package holds one built file and requires nothing but PHP, so it does not
 touch the versions of your application's own dependencies.
 
-To update: `composer global update brewless/cli`.
+### Staying up to date
+
+Once a day, after a command, the client looks whether a newer version was
+released. If so it says which and asks whether to upgrade now. Yes installs it
+the way the client was installed (Composer, or the downloaded file after its
+checksum matched); no shows the command to do it later. It only asks a person
+at a terminal: in a pipeline or a pipe it stays silent, and
+`BREWLESS_NO_UPDATE_CHECK=1` turns it off.
 
 ### Without Composer
 
@@ -125,6 +132,7 @@ ended from the Account page of the console at any time.
 | `BREWLESS_HOST` | The domain organisations live under | `brewless.eu` |
 | `BREWLESS_SCHEME` | `http` only for a local installation | `https` |
 | `BREWLESS_HOME` | Where sign-ins are kept | `~/.config/brewless` |
+| `BREWLESS_NO_UPDATE_CHECK` | `1` never looks for a newer client | not set |
 
 ## Development
 
