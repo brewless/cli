@@ -6,25 +6,39 @@ deploys it to your own cloud account.
 
 ## Installation
 
-The client is one file, a phar. It needs PHP 8.3 or newer and `git` on the
-machine you deploy from.
+The client needs PHP 8.3 or newer and `git`. Install it with Composer, for
+every project on this machine or in one project:
+
+```bash
+composer global require brewless/cli
+```
+
+```bash
+composer require --dev brewless/cli
+```
+
+Installed globally the command is `brewless`, as long as Composer's global
+`vendor/bin` directory is on your `PATH`. Installed in a project it is
+`vendor/bin/brewless`:
+
+```bash
+vendor/bin/brewless list
+```
+
+The package holds one built file and requires nothing but PHP, so it does not
+touch the versions of your application's own dependencies.
+
+To update: `composer global update brewless/cli`.
+
+### Without Composer
+
+Every release carries the same file, with a checksum next to it:
 
 ```bash
 curl -fsSL -o brewless https://github.com/brewless/cli/releases/latest/download/brewless
-chmod +x brewless
-sudo mv brewless /usr/local/bin/brewless
-brewless --version
-```
-
-Every release carries a `brewless.sha256` next to the phar. To check the
-download before you move it:
-
-```bash
 curl -fsSL https://github.com/brewless/cli/releases/latest/download/brewless.sha256 | shasum -a 256 -c
+chmod +x brewless && sudo mv brewless /usr/local/bin/brewless
 ```
-
-To update, download it again. A specific version is under
-`https://github.com/brewless/cli/releases/download/v0.1.0/brewless`.
 
 ## Usage
 
@@ -86,7 +100,16 @@ ended from the Account page of the console at any time.
 composer install
 ./vendor/bin/pest
 ./vendor/bin/pint
-php brewless app:build brewless   # builds builds/brewless (a phar)
+```
+
+### Releasing
+
+`builds/brewless` is committed: it is the file Composer installs. Build it
+with the new version, commit it, then tag.
+
+```bash
+php -d phar.readonly=0 brewless app:build brewless --build-version=1.2.3
+git commit -am "chore: release 1.2.3" && git tag v1.2.3 && git push origin main v1.2.3
 ```
 
 ## Licence

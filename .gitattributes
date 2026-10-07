@@ -1,4 +1,17 @@
 * text=auto eol=lf
+/builds/brewless binary
+
+# A Composer install gets the built client and nothing else.
 /.github export-ignore
+/app export-ignore
+/bootstrap export-ignore
+/config export-ignore
+/tests export-ignore
+/brewless export-ignore
+/box.json export-ignore
+/composer.lock export-ignore
+/phpunit.xml.dist export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
 CONTRIBUTING.md export-ignore
 CHANGELOG.md export-ignore

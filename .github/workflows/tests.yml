@@ -17,3 +17,4 @@ jobs:
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: vendor/bin/pint --test
       - run: vendor/bin/pest
+      - run: builds/brewless --version
