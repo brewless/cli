@@ -19,6 +19,8 @@ final class Project
         public readonly string $organisation,
         public readonly string $application,
         public readonly string $framework,
+        /** The PHP version releases are built for, such as "8.4"; null leaves the choice to Brewless. */
+        public readonly ?string $php = null,
     ) {}
 
     public static function exists(string $directory): bool
@@ -40,13 +42,21 @@ final class Project
             }
         }
 
-        return new self($data['organisation'], $data['application'], is_string($data['framework'] ?? null) ? $data['framework'] : 'generic');
+        // YAML reads an unquoted 8.4 as a number; that is taken as it is meant.
+        $php = $data['php'] ?? null;
+        $php = is_float($php) || is_int($php) ? (string) $php : $php;
+
+        if ($php !== null && (! is_string($php) || preg_match('/^\d+\.\d+$/', $php) !== 1)) {
+            throw new RuntimeException(self::FILE.' names its PHP version in a way that cannot be read. Write it like: php: "8.4"');
+        }
+
+        return new self($data['organisation'], $data['application'], is_string($data['framework'] ?? null) ? $data['framework'] : 'generic', $php);
     }
 
     public function write(string $directory): void
     {
         $yaml = "# Which application this is at Brewless. No secrets belong in this file.\n"
-            .Yaml::dump(['organisation' => $this->organisation, 'application' => $this->application, 'framework' => $this->framework]);
+            .Yaml::dump(array_filter(['organisation' => $this->organisation, 'application' => $this->application, 'framework' => $this->framework, 'php' => $this->php], static fn (?string $value): bool => $value !== null));
 
         file_put_contents($directory.'/'.self::FILE, $yaml);
     }

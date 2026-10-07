@@ -17,4 +17,5 @@ First version.
 - `scale`: set between how many replicas your provider scales an environment.
 - `provision`: make what a new environment needs in your own cloud accounts.
 - `export`: write everything Brewless knows about an environment to a folder, with Terraform and without secrets.
+- `php` in `brewless.yml` chooses the PHP version a release is built for.
 - `detach`: stop Brewless managing an environment; everything keeps running in your own accounts.

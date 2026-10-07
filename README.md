@@ -15,6 +15,17 @@ brewless export production   # everything Brewless knows, as a folder with Terra
 brewless detach production   # Brewless stops managing it; it keeps running
 ```
 
+## PHP version
+
+A release is built for the PHP version your `brewless.yml` names:
+
+```yaml
+php: "8.3"
+```
+
+Without that line Brewless builds for its default version. The versions it
+can build are listed when you ask for one it cannot.
+
 ## What happens on a deploy
 
 1. The current commit is packed (`git archive`): only what is committed is deployed.

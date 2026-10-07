@@ -71,7 +71,44 @@ test('deploy uploads the commit to the customer project, starts a release and fo
         && str_ends_with($request->url(), '/environments/env1/releases')
         && $request['commit'] === COMMIT
         && $request['commit_time'] === 1791200000
-        && strlen($request['key']) >= 8);
+        && strlen($request['key']) >= 8
+        // The project names no PHP version, so none is asked for.
+        && ! array_key_exists('php', $request->data()));
+});
+
+test('deploy asks for the PHP version brewless.yml names, quoted or not, and passes on a refusal', function (string $line): void {
+    signedIn();
+    project();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', file_get_contents(getcwd().'/brewless.yml').$line."\n");
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['errors' => ['php' => ['That PHP version cannot be built. Choose one of: 8.3, 8.4, 8.5.']]], 422),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->expectsOutputToContain('Choose one of: 8.3, 8.4, 8.5.')
+        ->assertFailed();
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/environments/env1/releases') && $request['php'] === '8.2');
+})->with(['php: "8.2"', 'php: 8.2']);
+
+test('a PHP version that is not a version is refused before anything is uploaded', function (): void {
+    signedIn();
+    project();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', file_get_contents(getcwd().'/brewless.yml')."php: latest\n");
+
+    Http::fake();
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->expectsOutputToContain('Write it like: php: "8.4"')
+        ->assertFailed();
+
+    Http::assertNothingSent();
 });
 
 test('deploy warns about changes that are not committed', function (): void {

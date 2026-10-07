@@ -58,9 +58,11 @@ final class DeployCommand extends Command
                 'commit_time' => $git->commitTime(),
                 // One key per run of this command: a request that is sent twice starts one release.
                 'key' => 'cli-'.Str::lower(Str::random(24)),
+                // What brewless.yml asks for; without it Brewless builds for its default version.
+                ...($project->php === null ? [] : ['php' => $project->php]),
             ])['data'] ?? [];
 
-            $this->line('  Release '.$release['number']);
+            $this->line('  Release '.$release['number'].(is_string($release['php_version'] ?? null) ? ', PHP '.$release['php_version'] : ''));
 
             return $this->conclude($api, $this->follow($api, $release), $environment) ? self::SUCCESS : self::FAILURE;
         });

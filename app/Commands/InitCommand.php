@@ -24,6 +24,7 @@ final class InitCommand extends Command
         {--organisation= : The organisation the application belongs to}
         {--application= : The slug of an application that exists already}
         {--framework= : laravel, symfony or generic; detected from composer.json when left out}
+        {--php= : The PHP version to build for, such as 8.4; left out, Brewless builds for its default}
         {--force : Overwrite an existing brewless.yml}';
 
     protected $description = 'Connect this project to an application at Brewless';
@@ -60,7 +61,9 @@ final class InitCommand extends Command
                 throw new RuntimeException('The organisation '.$organisation.' has no application "'.$slug.'".');
             }
 
-            (new Project($organisation, (string) $slug, $framework))->write($directory);
+            $php = $this->option('php');
+
+            (new Project($organisation, (string) $slug, $framework, is_string($php) && $php !== '' ? $php : null))->write($directory);
 
             $this->components->info('Wrote brewless.yml. Commit it; it holds no secrets.');
             $this->line('  Next: brewless deploy <environment>');
