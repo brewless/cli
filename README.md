@@ -4,6 +4,30 @@ The command line client of [Brewless](https://brewless.eu). It signs this
 machine in to your organisation, connects a project to an application and
 deploys it to your own cloud account.
 
+## Installation
+
+The client is one file, a phar. It needs PHP 8.3 or newer and `git` on the
+machine you deploy from.
+
+```bash
+curl -fsSL -o brewless https://github.com/brewless/cli/releases/latest/download/brewless
+chmod +x brewless
+sudo mv brewless /usr/local/bin/brewless
+brewless --version
+```
+
+Every release carries a `brewless.sha256` next to the phar. To check the
+download before you move it:
+
+```bash
+curl -fsSL https://github.com/brewless/cli/releases/latest/download/brewless.sha256 | shasum -a 256 -c
+```
+
+To update, download it again. A specific version is under
+`https://github.com/brewless/cli/releases/download/v0.1.0/brewless`.
+
+## Usage
+
 ```bash
 brewless login acme          # sign in; you approve it in the console
 brewless init                # writes brewless.yml (no secrets) for this project
