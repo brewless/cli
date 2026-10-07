@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## 0.1.0 (not released yet)
+## 0.1.0 (2026-10-07)
 
 First version.
 
