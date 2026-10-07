@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Support\Updates;
-use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Phar;
@@ -18,7 +18,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Event::listen(CommandFinished::class, $this->offerUpgrade(...));
+        Event::listen(CommandStarting::class, $this->offerUpgrade(...));
     }
 
     /**
@@ -30,11 +30,11 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * After a command, say once a day that a newer client exists and offer to
-     * install it. Only to a person at a terminal: a pipeline, a pipe and a
-     * checkout of the source are left alone.
+     * Before a command, say once a day that a newer client exists and offer to
+     * install it first. Only to a person at a terminal: a pipeline, a pipe and
+     * a checkout of the source are left alone.
      */
-    private function offerUpgrade(CommandFinished $event): void
+    private function offerUpgrade(CommandStarting $event): void
     {
         $path = Phar::running(false);
 
@@ -60,19 +60,27 @@ class AppServiceProvider extends ServiceProvider
         $style->newLine();
         $style->writeln('  <fg=yellow>A newer Brewless client is available:</> '.$current.' → <options=bold>'.$latest.'</>');
 
-        if (! $style->confirm('Upgrade now?', true)) {
+        if (! $style->confirm('Upgrade first?', true)) {
             $style->writeln('  Later: '.$updates->byHand($plan, $path, $latest));
+            $style->newLine();
 
             return;
         }
 
-        if ($updates->upgrade($plan, $path, $latest, fn (string $output) => $style->write($output))) {
-            $style->writeln('  <fg=green>Brewless is now '.$latest.'.</>');
+        if (! $updates->upgrade($plan, $path, $latest, fn (string $output) => $style->write($output))) {
+            $style->writeln('  <fg=red>That did not work.</> Run it yourself: '.$updates->byHand($plan, $path, $latest));
+            $style->newLine();
 
-            // The file this process runs from was just replaced: stop here, with the command's own result.
-            exit($event->exitCode);
+            return;
         }
 
-        $style->writeln('  <fg=red>That did not work.</> Run it yourself: '.$updates->byHand($plan, $path, $latest));
+        $style->writeln('  <fg=green>Brewless is now '.$latest.'.</>');
+        $style->newLine();
+
+        // The file this process runs from was just replaced: what was asked for is run by the new one.
+        $arguments = array_map(escapeshellarg(...), array_slice((array) ($_SERVER['argv'] ?? []), 1));
+        passthru(escapeshellarg(PHP_BINARY).' '.escapeshellarg($path).' '.implode(' ', $arguments), $exitCode);
+
+        exit($exitCode);
     }
 }

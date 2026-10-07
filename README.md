@@ -30,10 +30,11 @@ touch the versions of your application's own dependencies.
 
 ### Staying up to date
 
-Once a day, after a command, the client looks whether a newer version was
-released. If so it says which and asks whether to upgrade now. Yes installs it
-the way the client was installed (Composer, or the downloaded file after its
-checksum matched); no shows the command to do it later. It only asks a person
+Once a day, before a command, the client looks whether a newer version was
+released. If so it says which and asks whether to upgrade first. Yes installs
+it the way the client was installed (Composer, or the downloaded file after
+its checksum matched) and then runs what you asked for with the new version;
+no shows the command to do it later and carries on. It only asks a person
 at a terminal: in a pipeline or a pipe it stays silent, and
 `BREWLESS_NO_UPDATE_CHECK=1` turns it off.
 

@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.2.1 (2026-10-07)
+
+- The question to upgrade comes before the command instead of after it; after a yes the command runs with the new version.
+
 ## 0.2.0 (2026-10-07)
 
 - Once a day the client says when a newer version exists and offers to install it. Silent in a pipeline or a pipe; `BREWLESS_NO_UPDATE_CHECK=1` turns it off.
