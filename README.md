@@ -44,14 +44,46 @@ chmod +x brewless && sudo mv brewless /usr/local/bin/brewless
 
 ```bash
 brewless login acme          # sign in; you approve it in the console
-brewless init                # writes brewless.yml (no secrets) for this project
-brewless provision production # makes the containers, database and edge in your own accounts
+brewless init                # connects this project, adds its environments and sets them up
+brewless provision production # sets one environment up later, or again after something stopped it
 brewless deploy production   # build the current commit and put it live
 brewless releases production # what was deployed
 brewless rollback production # put the previous release back
 brewless export production   # everything Brewless knows, as a folder with Terraform
 brewless detach production   # Brewless stops managing it; it keeps running
 ```
+
+## What init asks
+
+`brewless init` writes `brewless.yml` (no secrets) and then asks what the
+application should have:
+
+1. which environments, `production` and `staging` unless you say otherwise,
+   and in which region;
+2. for each one: a new Serverless SQL Database, a database that stands in
+   your Scaleway project already, or none;
+3. where its jobs wait: in that database, in a queue at Scaleway Queues, or
+   nowhere;
+4. whether it gets a private bucket for its files.
+
+It says back what that comes to and makes it, in your own accounts, after one
+yes. Say no and it prints the `brewless provision` line that does the same
+later.
+
+A script names everything and is asked nothing:
+
+```bash
+brewless init --application=shop --environments=production,staging --region=fr-par \
+    --database=new --queue=sqs --bucket --yes --no-interaction
+```
+
+### Coming from Laravel Vapor
+
+With a `vapor.yml` in the project, `init` offers to start from it: its
+environments, its PHP version, and for each environment a database, a queue
+and a bucket where Vapor had one. Nothing at Vapor or AWS is read or changed.
+Your variables, the data in your databases and the files in your buckets are
+yours to move; `init` lists them at the end.
 
 ## PHP version
 

@@ -24,6 +24,9 @@ uses()->beforeEach(function (): void {
     $this->previousDirectory = getcwd();
     chdir($this->project);
 
+    // Questions are answered by the test: a prompt falls back to one that can be expected.
+    app()->instance('env', 'testing');
+
     Http::preventStrayRequests();
     Sleep::fake();
 })->afterEach(function (): void {
