@@ -105,3 +105,93 @@ test('without Scaleway connected nothing is asked and it says where to connect i
         ->expectsOutputToContain('Scaleway is not connected to this organisation yet.')
         ->assertFailed();
 });
+
+test('where the region has no Serverless SQL Database it is not offered, and an existing database comes first', function (): void {
+    Http::fake([
+        '*/cli/api/applications' => Http::response(['data' => [['id' => 'app1', 'slug' => 'shop', 'environments' => [['id' => 'env1', 'slug' => 'production', 'region' => 'nl-ams']]]]]),
+        '*/environments/env1/databases' => Http::response([
+            'data' => [['key' => 'scaleway:database:rdb-1', 'kind' => 'database', 'name' => 'main', 'in_use' => false]],
+            'unavailable' => [],
+            'offers' => ['serverless_database' => false, 'queue' => true],
+        ]),
+        '*/environments/env1/provision' => Http::response(['data' => ['id' => 'op1', 'status' => 'succeeded', 'steps' => [], 'result' => []]], 201),
+    ]);
+
+    $this->artisan('provision', ['environment' => 'production'])
+        ->expectsOutputToContain('Scaleway does not offer Serverless SQL Database in nl-ams.')
+        ->expectsChoice('Which database should production use?', 'scaleway:database:rdb-1', [
+            'scaleway:database:rdb-1', 'Existing: main (Managed Database)', 'none', 'No database',
+        ])
+        ->expectsChoice('Where should the jobs of production wait?', 'sqs', [
+            'database', 'In the database: nothing extra to make', 'sqs', 'A queue at Scaleway Queues (SQS)', 'none', 'No queue: a job runs during the request',
+        ])
+        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/provision') && $request['database'] === 'existing' && $request['queue'] === 'sqs');
+});
+
+test('where the region has neither, Scaleway Queues is left out and without a database the queue is not asked', function (): void {
+    Http::fake([
+        '*/cli/api/applications' => Http::response(['data' => [['id' => 'app1', 'slug' => 'shop', 'environments' => [['id' => 'env1', 'slug' => 'production', 'region' => 'pl-waw']]]]]),
+        '*/environments/env1/databases' => Http::sequence()
+            ->push(['data' => [['key' => 'scaleway:database:rdb-1', 'kind' => 'database', 'name' => 'main', 'in_use' => false]], 'unavailable' => [], 'offers' => ['serverless_database' => false, 'queue' => false]])
+            ->push(['data' => [], 'unavailable' => [], 'offers' => ['serverless_database' => false, 'queue' => false]]),
+        '*/environments/env1/provision' => Http::response(['data' => ['id' => 'op1', 'status' => 'succeeded', 'steps' => [], 'result' => []]], 201),
+    ]);
+
+    $this->artisan('provision', ['environment' => 'production'])
+        ->expectsChoice('Which database should production use?', 'scaleway:database:rdb-1', [
+            'scaleway:database:rdb-1', 'Existing: main (Managed Database)', 'none', 'No database',
+        ])
+        ->expectsChoice('Where should the jobs of production wait?', 'database', [
+            'database', 'In the database: nothing extra to make', 'none', 'No queue: a job runs during the request',
+        ])
+        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->assertSuccessful();
+
+    // Nothing to choose from but "No database", and then nothing left for the jobs but no queue.
+    $this->artisan('provision', ['environment' => 'production'])
+        ->expectsChoice('Which database should production use?', 'none', ['none', 'No database'])
+        ->doesntExpectOutputToContain('Where should the jobs of production wait?')
+        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/provision') && $request['database'] === 'none' && $request['queue'] === 'none');
+});
+
+test('a control plane that says nothing about the region offers everything', function (): void {
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env1/databases' => Http::response(['data' => [], 'unavailable' => []]),
+        '*/environments/env1/provision' => Http::response(['data' => ['id' => 'op1', 'status' => 'succeeded', 'steps' => [], 'result' => []]], 201),
+    ]);
+
+    $this->artisan('provision', ['environment' => 'production'])
+        ->doesntExpectOutputToContain('Scaleway does not offer')
+        ->expectsChoice('Which database should production use?', 'new', [
+            'new', 'A new Serverless SQL Database, which sleeps while nobody uses it', 'none', 'No database',
+        ])
+        ->expectsChoice('Where should the jobs of production wait?', 'sqs', [
+            'database', 'In the database: nothing extra to make', 'sqs', 'A queue at Scaleway Queues (SQS)', 'none', 'No queue: a job runs during the request',
+        ])
+        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->assertSuccessful();
+});
+
+test('options for what the region does not offer end in the server\'s own words', function (): void {
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env1/provision' => Http::sequence()
+            ->push(['message' => 'Invalid.', 'errors' => ['database' => ['Scaleway does not offer Serverless SQL Database in Warsaw. Choose a database that exists already, or none.']]], 422)
+            ->push(['message' => 'Invalid.', 'errors' => ['queue' => ['Scaleway does not offer Queues in Warsaw. Let the jobs wait in the database, or choose no queue.']]], 422),
+    ]);
+
+    $this->artisan('provision', ['environment' => 'production', '--database' => 'new', '--no-interaction' => true])
+        ->expectsOutputToContain('Scaleway does not offer Serverless SQL Database in Warsaw.')
+        ->assertFailed();
+
+    $this->artisan('provision', ['environment' => 'production', '--no-database' => true, '--queue' => 'sqs'])
+        ->expectsOutputToContain('Scaleway does not offer Queues in Warsaw.')
+        ->assertFailed();
+});

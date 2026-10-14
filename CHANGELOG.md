@@ -4,6 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.3.0 (2026-10-14)
+
+- The questions of `init` and `provision` follow what Scaleway offers in the environment's region: no new Serverless SQL Database outside Paris, no Scaleway Queues outside Paris and Amsterdam. "Set it up the same way" is only offered when the region can make that.
+- A plan the server refuses, such as `--database=new` in a region without Serverless SQL Database, ends in the server's own words; `init` adds how to try again.
+
 ## 0.2.1 (2026-10-07)
 
 - The question to upgrade comes before the command instead of after it; after a yes the command runs with the new version.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Commands\Concerns;
 
 use App\Support\Api;
+use App\Support\ApiException;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -111,7 +112,11 @@ trait SetsEnvironmentsUp
             return null;
         }
 
-        if ($before !== null && confirm('Set '.$name.' up the same way ('.$this->describeSetup($before).')?')) {
+        // A control plane from before regions differed says nothing about it: then everything is on offer.
+        $offers = (array) ($found['offers'] ?? []) + ['serverless_database' => true, 'queue' => true];
+        $region = is_string($environment['region'] ?? null) ? $environment['region'] : 'the region of '.$name;
+
+        if ($before !== null && $this->offered($before, $offers) && confirm('Set '.$name.' up the same way ('.$this->describeSetup($before).')?')) {
             return $before;
         }
 
@@ -121,18 +126,28 @@ trait SetsEnvironmentsUp
             $existing[(string) $database['key']] = $database;
         }
 
-        $options = ['new' => 'A new Serverless SQL Database, which sleeps while nobody uses it'];
+        $options = [];
+
+        if ($offers['serverless_database'] === true) {
+            $options['new'] = 'A new Serverless SQL Database, which sleeps while nobody uses it';
+        } else {
+            $this->line('  Scaleway does not offer Serverless SQL Database in '.$region.'.');
+        }
 
         foreach ($existing as $key => $database) {
             $options[$key] = 'Existing: '.$database['name'].' ('.(($database['kind'] ?? '') === 'database' ? 'Managed Database' : 'Serverless SQL Database').(($database['in_use'] ?? false) === true ? ', used by another environment' : '').')';
         }
 
-        $database = (string) select(label: 'Which database should '.$name.' use?', options: $options + ['none' => 'No database'], default: 'new');
+        $options['none'] = 'No database';
+
+        $database = (string) select(label: 'Which database should '.$name.' use?', options: $options, default: array_key_first($options));
 
         $queues = ($database === 'none' ? [] : ['database' => 'In the database: nothing extra to make'])
-            + ['sqs' => 'A queue at Scaleway Queues (SQS)', 'none' => 'No queue: a job runs during the request'];
+            + ($offers['queue'] === true ? ['sqs' => 'A queue at Scaleway Queues (SQS)'] : [])
+            + ['none' => 'No queue: a job runs during the request'];
 
-        $queue = (string) select(label: 'Where should the jobs of '.$name.' wait?', options: $queues, default: array_key_first($queues));
+        // With no database and no Scaleway Queues there is nothing left to choose.
+        $queue = count($queues) === 1 ? 'none' : (string) select(label: 'Where should the jobs of '.$name.' wait?', options: $queues, default: array_key_first($queues));
         $bucket = confirm('A private bucket at Scaleway Object Storage for the files of '.$name.'? A container keeps no files of its own.');
 
         return [
@@ -190,13 +205,24 @@ trait SetsEnvironmentsUp
     {
         $name = (string) ($environment['slug'] ?? '');
 
-        $operation = $api->post('/api/environments/'.$environment['id'].'/provision', [
-            'database' => $plan['database'],
-            'database_resource' => $plan['database_resource'],
-            'queue' => $plan['queue'],
-            'bucket' => $plan['bucket'],
-            'key' => 'cli-'.Str::lower(Str::random(24)),
-        ])['data'] ?? [];
+        try {
+            $operation = $api->post('/api/environments/'.$environment['id'].'/provision', [
+                'database' => $plan['database'],
+                'database_resource' => $plan['database_resource'],
+                'queue' => $plan['queue'],
+                'bucket' => $plan['bucket'],
+                'key' => 'cli-'.Str::lower(Str::random(24)),
+            ])['data'] ?? [];
+        } catch (ApiException $exception) {
+            // A plan the server refuses, such as what the region does not offer, is said as the server put it.
+            if ($exception->status !== 422) {
+                throw $exception;
+            }
+
+            $this->components->error($exception->getMessage());
+
+            return false;
+        }
 
         // A step that has nothing to do for this plan is not worth a line.
         $silent = array_filter(['database' => $plan['database'] === 'none', 'queue' => $plan['queue'] !== 'sqs', 'bucket' => ! $plan['bucket']]);
@@ -240,6 +266,18 @@ trait SetsEnvironmentsUp
         }
 
         return true;
+    }
+
+    /**
+     * Whether the region can make what a plan asks for.
+     *
+     * @param  array<string, mixed>  $plan
+     * @param  array<string, mixed>  $offers
+     */
+    private function offered(array $plan, array $offers): bool
+    {
+        return ($plan['database'] !== 'new' || $offers['serverless_database'] === true)
+            && ($plan['queue'] !== 'sqs' || $offers['queue'] === true);
     }
 
     /**

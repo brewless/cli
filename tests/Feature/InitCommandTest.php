@@ -164,3 +164,42 @@ test('a vapor.yml that is declined changes nothing about the questions', functio
 
     expect(Project::read($this->project)->php)->toBeNull();
 });
+
+test('the same way is not offered when the next environment\'s region cannot make it', function (): void {
+    signedIn('acme');
+    // The first stub that matches answers: staging's region goes before the rest of the fresh organisation.
+    Http::fake([
+        '*/environments/env-staging/databases' => Http::response(['data' => [], 'unavailable' => [], 'offers' => ['serverless_database' => false, 'queue' => true]]),
+    ]);
+    freshOrganisation();
+
+    $this->artisan('init')
+        ->expectsQuestion('Which application is this?', '+ a new application')
+        ->expectsQuestion('What is the application called?', 'privasearch')
+        ->expectsQuestion('Which environments should it have?', ['production', 'staging'])
+        ->expectsQuestion('In which region?', 'fr-par')
+        ->expectsQuestion('Which database should production use?', 'new')
+        ->expectsQuestion('Where should the jobs of production wait?', 'database')
+        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->doesntExpectOutputToContain('Set staging up the same way')
+        ->expectsChoice('Which database should staging use?', 'none', ['none', 'No database'])
+        ->expectsQuestion('Where should the jobs of staging wait?', 'none')
+        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of staging? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('Make this now?', 'no')
+        ->assertSuccessful();
+});
+
+test('a plan the server refuses for the region is said in its words, with how to try again', function (): void {
+    signedIn('acme');
+    Http::fake([
+        '*/cli/api/applications' => Http::response(['data' => [['id' => 'app9', 'slug' => 'shop', 'environments' => []]]]),
+        '*/applications/app9/environments' => Http::response(['data' => ['id' => 'env-production', 'slug' => 'production', 'region' => 'pl-waw']], 201),
+        '*/provision' => Http::response(['message' => 'Invalid.', 'errors' => ['database' => ['Scaleway does not offer Serverless SQL Database in Warsaw. Choose a database that exists already, or none.']]], 422),
+    ]);
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'pl-waw', '--database' => 'new', '--yes' => true, '--no-interaction' => true])
+        ->expectsOutputToContain('Scaleway does not offer Serverless SQL Database in Warsaw.')
+        ->expectsOutputToContain('When that is settled: brewless provision production')
+        ->expectsOutputToContain('Next: brewless provision production')
+        ->assertSuccessful();
+});
