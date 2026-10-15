@@ -37,6 +37,7 @@ trait SetsEnvironmentsUp
         'edge' => 'Edge in front, when bunny.net is connected',
         'variables' => 'First variables in your Secret Manager',
         'record' => 'Noted as resources of the environment',
+        'access' => 'Login of its own in the database',
     ];
 
     /**

@@ -72,9 +72,20 @@ trait AppliesManifest
                 return false;
             }
 
-            // A web container to put the domains on is there now.
-            if (! $running && ($settings['domains'] ?? []) !== []) {
+            // It runs now: what needs an environment that runs, a linked database and domains, comes with a second call.
+            if (! $running) {
                 $applied = $this->sendManifest($api, $application, $manifest, $slug) ?: $applied;
+            }
+        }
+
+        if (is_array($applied['database_link'] ?? null)) {
+            $this->line('  Linking the database '.$settings['database'].' to '.$slug.', with a login of its own');
+            $link = $this->followSetup($api, $applied['database_link']);
+
+            if (($link['status'] ?? '') !== 'succeeded') {
+                $this->components->error($link['error_message'] ?? 'The database was not linked.');
+
+                return false;
             }
         }
 

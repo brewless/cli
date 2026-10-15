@@ -393,7 +393,10 @@ test('an environment the file names that does not exist yet is made and set up b
 
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::sequence()->push(applications())->push($withPreview),
-        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['data' => applied(['created' => true, 'running' => false, 'environment' => ['slug' => 'preview', 'kind' => 'development', 'region' => 'fr-par'], 'operation' => $setup()])]),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::sequence()
+            ->push(['data' => applied(['created' => true, 'running' => false, 'environment' => ['slug' => 'preview', 'kind' => 'development', 'region' => 'fr-par'], 'operation' => $setup()])])
+            // Applied again once it runs: the database Brewless manages already is linked then.
+            ->push(['data' => applied(['environment' => ['slug' => 'preview', 'kind' => 'development', 'region' => 'fr-par'], 'database_link' => ['id' => 'op9', 'status' => 'succeeded', 'steps' => [['name' => 'access', 'status' => 'succeeded'], ['name' => 'variables', 'status' => 'succeeded']]]])]),
         'https://acme.brewless.eu/cli/api/operations/op1' => Http::response(['data' => $setup('registry', 'namespace', 'database', 'queue', 'bucket', 'containers', 'edge', 'variables', 'record')]),
         'https://acme.brewless.eu/cli/api/environments/env3/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
@@ -407,6 +410,8 @@ test('an environment the file names that does not exist yet is made and set up b
         ->expectsOutputToContain('Setting preview up from brewless.yml')
         ->expectsOutputToContain('Web, release and worker container')
         ->expectsOutputToContain('Database')
+        ->expectsOutputToContain('Linking the database shop-preview to preview, with a login of its own')
+        ->expectsOutputToContain('Login of its own in the database')
         // Nothing asked for a bucket: no line about one.
         ->doesntExpectOutputToContain('Bucket for files')
         ->expectsOutputToContain('Release 2 is live.')
