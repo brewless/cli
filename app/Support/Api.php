@@ -32,12 +32,29 @@ final class Api
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function delete(string $path): array
+    {
+        return $this->answer(fn (PendingRequest $request): Response => $request->delete($this->baseUrl().$path));
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */
     public function post(string $path, array $body = []): array
     {
         return $this->answer(fn (PendingRequest $request): Response => $request->post($this->baseUrl().$path, $body));
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    public function put(string $path, array $body = []): array
+    {
+        return $this->answer(fn (PendingRequest $request): Response => $request->put($this->baseUrl().$path, $body));
     }
 
     /**
