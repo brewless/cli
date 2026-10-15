@@ -225,31 +225,8 @@ trait SetsEnvironmentsUp
         }
 
         // A step that has nothing to do for this plan is not worth a line.
-        $silent = array_filter(['database' => $plan['database'] === 'none', 'queue' => $plan['queue'] !== 'sqs', 'bucket' => ! $plan['bucket']]);
-        $shown = [];
-
-        // A namespace and a database take a moment to be made; each step is printed as it finishes.
-        while (true) {
-            foreach ($operation['steps'] ?? [] as $step) {
-                $stepName = (string) ($step['name'] ?? '');
-
-                if (($step['status'] ?? '') === 'succeeded' && ! in_array($stepName, $shown, true)) {
-                    $shown[] = $stepName;
-
-                    if (! isset($silent[$stepName])) {
-                        $this->line('  '.(self::SETUP_STEPS[$stepName] ?? $stepName));
-                    }
-                }
-            }
-
-            if (in_array($operation['status'] ?? '', ['succeeded', 'failed', 'cancelled'], true)) {
-                break;
-            }
-
-            Sleep::for(3)->seconds();
-
-            $operation = $api->get('/api/operations/'.$operation['id'])['data'] ?? $operation;
-        }
+        $silent = array_keys(array_filter(['database' => $plan['database'] === 'none', 'queue' => $plan['queue'] !== 'sqs', 'bucket' => ! $plan['bucket']]));
+        $operation = $this->followSetup($api, $operation, $silent);
 
         if (($operation['status'] ?? '') !== 'succeeded') {
             $this->components->error($operation['error_message'] ?? 'The environment '.$name.' was not set up.');
@@ -266,6 +243,42 @@ trait SetsEnvironmentsUp
         }
 
         return true;
+    }
+
+    /**
+     * Follow an operation that sets an environment up until it is over, and
+     * print each step as it finishes, but those named silent.
+     *
+     * @param  array<string, mixed>  $operation
+     * @param  list<string>  $silent
+     * @return array<string, mixed> the operation as it ended
+     */
+    protected function followSetup(Api $api, array $operation, array $silent = []): array
+    {
+        $shown = [];
+
+        // A namespace and a database take a moment to be made; each step is printed as it finishes.
+        while (true) {
+            foreach ($operation['steps'] ?? [] as $step) {
+                $stepName = (string) ($step['name'] ?? '');
+
+                if (($step['status'] ?? '') === 'succeeded' && ! in_array($stepName, $shown, true)) {
+                    $shown[] = $stepName;
+
+                    if (! in_array($stepName, $silent, true)) {
+                        $this->line('  '.(self::SETUP_STEPS[$stepName] ?? $stepName));
+                    }
+                }
+            }
+
+            if (in_array($operation['status'] ?? '', ['succeeded', 'failed', 'cancelled'], true)) {
+                return $operation;
+            }
+
+            Sleep::for(3)->seconds();
+
+            $operation = $api->get('/api/operations/'.$operation['id'])['data'] ?? $operation;
+        }
     }
 
     /**

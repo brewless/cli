@@ -27,6 +27,17 @@ function repository(string $status = ''): void
 }
 
 /**
+ * What applying brewless.yml answers: by default an environment that runs and has all the file asks.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function applied(array $overrides = []): array
+{
+    return [...['environment' => ['slug' => 'production', 'kind' => 'production', 'region' => 'fr-par'], 'created' => false, 'running' => true, 'operation' => null, 'domains' => [], 'released' => []], ...$overrides];
+}
+
+/**
  * @return list<array<string, mixed>>
  */
 function steps(string ...$succeeded): array
@@ -315,9 +326,15 @@ test('deploy sends the whole of brewless.yml along, for Brewless to apply what i
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
         'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['data' => applied()]),
     ]);
 
     $this->artisan('deploy', ['environment' => 'production'])->assertSuccessful();
+
+    // The resources first, for the environment the deploy is for.
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/manifest/apply')
+        && $request['environment'] === 'production'
+        && $request['manifest']['environments']['production']['web'] === ['memory' => 1024, 'max' => 5]);
 
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/environments/env1/releases')
         && $request['manifest']['release'] === ['migrate --force']
@@ -342,7 +359,7 @@ test('what Brewless refuses in brewless.yml at a deploy is shown with its line, 
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
         'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['message' => 'invalid', 'errors' => ['manifest.environments.production.web.memory' => ['Give memory from 500 to 2000 megabytes with this cpu.']]], 422),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['message' => 'invalid', 'errors' => ['manifest.environments.production.web.memory' => ['Give memory from 500 to 2000 megabytes with this cpu.']]], 422),
     ]);
 
     $this->artisan('deploy', ['environment' => 'production'])
@@ -350,4 +367,109 @@ test('what Brewless refuses in brewless.yml at a deploy is shown with its line, 
         ->expectsOutputToContain('line 6: Give memory from 500 to 2000 megabytes with this cpu.')
         ->expectsOutputToContain('Nothing was deployed.')
         ->assertFailed();
+
+    // Refused before anything left this machine.
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/releases'));
+});
+
+test('an environment the file names that does not exist yet is made and set up before the release goes onto it', function (): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', <<<'YAML'
+        organisation: acme
+        application: shop
+        environments:
+          preview:
+            kind: development
+            database: shop-preview
+        YAML);
+
+    $withPreview = applications();
+    $withPreview['data'][0]['environments'][] = ['id' => 'env3', 'slug' => 'preview', 'name' => 'Preview'];
+    $setup = static fn (string ...$succeeded): array => ['id' => 'op1', 'status' => count($succeeded) === 9 ? 'succeeded' : 'running', 'steps' => array_map(
+        static fn (string $name): array => ['name' => $name, 'status' => in_array($name, $succeeded, true) ? 'succeeded' : 'pending'],
+        ['registry', 'namespace', 'database', 'queue', 'bucket', 'containers', 'edge', 'variables', 'record'],
+    )];
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::sequence()->push(applications())->push($withPreview),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['data' => applied(['created' => true, 'running' => false, 'environment' => ['slug' => 'preview', 'kind' => 'development', 'region' => 'fr-par'], 'operation' => $setup()])]),
+        'https://acme.brewless.eu/cli/api/operations/op1' => Http::response(['data' => $setup('registry', 'namespace', 'database', 'queue', 'bucket', 'containers', 'edge', 'variables', 'record')]),
+        'https://acme.brewless.eu/cli/api/environments/env3/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env3/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
+        'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
+        'https://acme.brewless.eu/cli/api/environments/env3/addresses' => Http::response(['data' => []]),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'preview'])
+        ->expectsOutputToContain('Made the environment preview (development, fr-par)')
+        ->expectsOutputToContain('Setting preview up from brewless.yml')
+        ->expectsOutputToContain('Web, release and worker container')
+        ->expectsOutputToContain('Database')
+        // Nothing asked for a bucket: no line about one.
+        ->doesntExpectOutputToContain('Bucket for files')
+        ->expectsOutputToContain('Release 2 is live.')
+        ->assertSuccessful();
+});
+
+test('a set-up that fails deploys nothing', function (): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', "organisation: acme\napplication: shop\nenvironments:\n  production:\n    storage: shop-files\n");
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['data' => applied(['operation' => ['id' => 'op1', 'status' => 'failed', 'error_message' => 'The bucket could not be made.', 'steps' => []]])]),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->expectsOutputToContain('The bucket could not be made.')
+        ->expectsOutputToContain('Nothing was deployed.')
+        ->assertFailed();
+
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/releases'));
+});
+
+test('domains the file adds and resources it lets go are said, and the release follows', function (): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', "organisation: acme\napplication: shop\nenvironments:\n  production:\n    database: false\n    domains: [shop.example.eu]\n");
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['data' => applied(['domains' => [['hostname' => 'shop.example.eu', 'id' => 'op2', 'status' => 'queued']], 'released' => ['shop-main']])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
+        'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->expectsOutputToContain('Adding the domain shop.example.eu.')
+        ->expectsOutputToContain('shop-main is no longer part of production. It keeps running at Scaleway')
+        ->expectsOutputToContain('Release 2 is live.')
+        ->assertSuccessful();
+});
+
+test('a Brewless that does not set environments up from the file yet still deploys', function (): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', "organisation: acme\napplication: shop\nenvironments:\n  production:\n    database: shop-main\n");
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['message' => 'Not Found'], 404),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
+        'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->expectsOutputToContain('does not set environments up from brewless.yml yet')
+        ->expectsOutputToContain('Release 2 is live.')
+        ->assertSuccessful();
 });

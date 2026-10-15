@@ -121,6 +121,12 @@ can build are listed when you ask for one it cannot.
 
 ## What happens on a deploy
 
+0. What `brewless.yml` asks of the environment's resources is done first:
+   an environment it names that does not exist yet is made and set up, an
+   environment that runs gets the database, queue or bucket it is missing,
+   and the domains it does not answer on yet are added. What stands is never
+   switched for something else; that is refused with its line, and nothing is
+   deployed.
 1. The current commit is packed (`git archive`): only what is committed is deployed.
 2. The archive is uploaded straight into a private bucket of **your own**
    Scaleway project, through a link that works for fifteen minutes. The source

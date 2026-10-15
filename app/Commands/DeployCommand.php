@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Commands\Concerns\AppliesManifest;
 use App\Commands\Concerns\FollowsReleases;
 use App\Commands\Concerns\ReportsManifestErrors;
+use App\Commands\Concerns\SetsEnvironmentsUp;
 use App\Commands\Concerns\TalksToBrewless;
 use App\Support\ApiException;
 use App\Support\Git;
@@ -17,8 +19,10 @@ use RuntimeException;
 
 final class DeployCommand extends Command
 {
+    use AppliesManifest;
     use FollowsReleases;
     use ReportsManifestErrors;
+    use SetsEnvironmentsUp;
     use TalksToBrewless;
 
     protected $signature = 'deploy {environment? : The environment to deploy to, such as production; without it, default-environment in brewless.yml}';
@@ -34,6 +38,14 @@ final class DeployCommand extends Command
             $slug = $this->argument('environment') ?? $manifest->defaultEnvironment()
                 ?? throw new RuntimeException('Name the environment to deploy to, such as: brewless deploy production. Or set default-environment in brewless.yml.');
             $slug = (string) $slug;
+
+            // The environment, its resources and domains first, as the file asks; the release goes onto what stands then.
+            if (! $this->applyManifest($api, $project, $manifest, $slug)) {
+                $this->line('  Nothing was deployed.');
+
+                return self::FAILURE;
+            }
+
             ['environment' => $environment] = $this->environment($api, $project, $slug);
 
             $git = new Git((string) getcwd());

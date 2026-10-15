@@ -42,20 +42,30 @@ trait TalksToBrewless
      */
     protected function environment(Api $api, Project $project, string $slug): array
     {
+        $application = $this->application($api, $project);
+
+        foreach ($application['environments'] ?? [] as $environment) {
+            if (($environment['slug'] ?? null) === $slug) {
+                return ['application' => $application, 'environment' => $environment];
+            }
+        }
+
+        $known = implode(', ', array_column($application['environments'] ?? [], 'slug'));
+
+        throw new RuntimeException('The application '.$project->application.' has no environment "'.$slug.'".'.($known === '' ? ' Add one in the console first.' : ' It has: '.$known.'.'));
+    }
+
+    /**
+     * The application of the project, as Brewless knows it.
+     *
+     * @return array<string, mixed>
+     */
+    protected function application(Api $api, Project $project): array
+    {
         foreach ($api->get('/api/applications')['data'] ?? [] as $application) {
-            if (($application['slug'] ?? null) !== $project->application) {
-                continue;
+            if (($application['slug'] ?? null) === $project->application) {
+                return $application;
             }
-
-            foreach ($application['environments'] ?? [] as $environment) {
-                if (($environment['slug'] ?? null) === $slug) {
-                    return ['application' => $application, 'environment' => $environment];
-                }
-            }
-
-            $known = implode(', ', array_column($application['environments'] ?? [], 'slug'));
-
-            throw new RuntimeException('The application '.$project->application.' has no environment "'.$slug.'".'.($known === '' ? ' Add one in the console first.' : ' It has: '.$known.'.'));
         }
 
         throw new RuntimeException('The organisation '.$project->organisation.' has no application "'.$project->application.'". Check brewless.yml, or run brewless init.');

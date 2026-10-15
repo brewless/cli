@@ -1,0 +1,114 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Commands\Concerns;
+
+use App\Support\Api;
+use App\Support\ApiException;
+use App\Support\Manifest;
+use App\Support\Project;
+
+/**
+ * What brewless.yml asks of an environment's resources, carried out before a
+ * deploy: the environment itself, its database, queue and bucket, and its
+ * domains. Brewless makes only what is missing and refuses to switch what
+ * stands; the refusals are printed with their line.
+ *
+ * Needs SetsEnvironmentsUp and ReportsManifestErrors next to it.
+ */
+trait AppliesManifest
+{
+    /**
+     * Whether the deploy can go on: false when the file was refused or
+     * setting the environment up failed, which is said here.
+     */
+    protected function applyManifest(Api $api, Project $project, Manifest $manifest, string $slug): bool
+    {
+        $settings = $manifest->data['environments'][$slug] ?? null;
+
+        // An environment the file does not name is deployed as it stands.
+        if (! is_array($settings)) {
+            return true;
+        }
+
+        $application = $this->application($api, $project);
+        $applied = $this->sendManifest($api, $application, $manifest, $slug);
+
+        if ($applied === false) {
+            return false;
+        }
+
+        if ($applied === null) {
+            return true;
+        }
+
+        if (($applied['created'] ?? false) === true) {
+            $this->line('  Made the environment <options=bold>'.$slug.'</> ('.($applied['environment']['kind'] ?? '').', '.($applied['environment']['region'] ?? '').')');
+        }
+
+        if (is_array($applied['operation'] ?? null)) {
+            $running = ($applied['running'] ?? false) === true;
+            $this->line('  '.($running ? 'Adding what '.$slug.' is missing' : 'Setting '.$slug.' up').' from '.Project::FILE);
+
+            // What the file does not ask for is not made; adding to an environment that runs leaves what makes it run alone.
+            $silent = array_keys(array_filter([
+                'registry' => $running,
+                'namespace' => $running,
+                'containers' => $running,
+                'edge' => $running,
+                'database' => ! is_string($settings['database'] ?? null),
+                'queue' => ($settings['queue'] ?? null) !== 'sqs',
+                'bucket' => ! is_string($settings['storage'] ?? null),
+            ]));
+            $operation = $this->followSetup($api, $applied['operation'], $silent);
+
+            if (($operation['status'] ?? '') !== 'succeeded') {
+                $this->components->error($operation['error_message'] ?? $slug.' was not set up.');
+
+                return false;
+            }
+
+            // A web container to put the domains on is there now.
+            if (! $running && ($settings['domains'] ?? []) !== []) {
+                $applied = $this->sendManifest($api, $application, $manifest, $slug) ?: $applied;
+            }
+        }
+
+        foreach ($applied['domains'] ?? [] as $domain) {
+            $this->line('  Adding the domain <options=bold>'.($domain['hostname'] ?? 'named in '.Project::FILE).'</>. It carries on after the deploy; its certificate comes once the DNS points the right way. See it under Domains in the console.');
+        }
+
+        foreach ($applied['released'] ?? [] as $name) {
+            $this->line('  '.$name.' is no longer part of '.$slug.'. It keeps running at Scaleway, and your variables still point at it until you change them.');
+        }
+
+        return true;
+    }
+
+    /**
+     * Send the file. Null when this Brewless does not apply resources yet;
+     * false when it refused the file.
+     *
+     * @param  array<string, mixed>  $application
+     * @return array<string, mixed>|false|null
+     */
+    private function sendManifest(Api $api, array $application, Manifest $manifest, string $slug): array|false|null
+    {
+        try {
+            return $api->post('/api/applications/'.$application['id'].'/manifest/apply', ['environment' => $slug, 'manifest' => $manifest->data])['data'] ?? [];
+        } catch (ApiException $exception) {
+            if ($exception->status === 404) {
+                $this->components->warn('This Brewless does not set environments up from '.Project::FILE.' yet. The release is deployed to the environment as it stands.');
+
+                return null;
+            }
+
+            if ($this->manifestRefused($manifest, $exception)) {
+                return false;
+            }
+
+            throw $exception;
+        }
+    }
+}
