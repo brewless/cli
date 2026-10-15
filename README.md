@@ -132,7 +132,9 @@ can build are listed when you ask for one it cannot.
    then the workers follow.
 
 The client prints each step as it finishes and ends with the address of the
-environment.
+environment. In a terminal, the step that is still running gets a live line
+with its seconds and what it waits for; in a log (no terminal, or with
+`--no-interaction`) only the finished steps are printed.
 
 ## Signing in
 
