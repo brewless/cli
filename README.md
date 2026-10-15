@@ -129,7 +129,8 @@ can build are listed when you ask for one it cannot.
 0. What `brewless.yml` asks of the environment's resources is done first:
    an environment it names that does not exist yet is made and set up, an
    environment that runs gets the database, queue or bucket it is missing,
-   and the domains it does not answer on yet are added. What stands is never
+   and the domains it does not answer on yet are added after a yes (or with
+   `--domains`), since a domain can move visitors. What stands is never
    switched for something else; that is refused with its line, and nothing is
    deployed.
 1. The current commit is packed (`git archive`): only what is committed is deployed.

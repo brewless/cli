@@ -7,7 +7,7 @@ change how a command behaves.
 ## Unreleased
 
 - `deploy` sends the whole `brewless.yml` along. Brewless applies sizes, scale, timeouts, `worker.queues`, `scheduler`, `build` and `release` steps and plain `variables` with the release (this needs Brewless with brewless.yml phase 2, and `brewless/laravel` 0.3 for `release`).
-- Before the release, `deploy` does what the file asks of the environment's resources: it makes an environment the file names that does not exist yet and sets it up, adds a database, queue or bucket it is missing, and adds its domains. It prints each step and what it let go after `false`. A Brewless that does not do this yet is told apart, and the release is deployed as before.
+- Before the release, `deploy` does what the file asks of the environment's resources: it makes an environment the file names that does not exist yet and sets it up, adds a database, queue or bucket it is missing, and adds its domains. It prints each step and what it let go after `false`. Domains the environment does not answer on yet are named and only added after a yes, or with `deploy --domains`: adding one can point its DNS at Brewless. A Brewless that does not do this yet is told apart, and the release is deployed as before.
 - What Brewless refuses in the file at a deploy is printed with its line, and nothing is deployed.
 - `plan` marks lines a deploy would refuse with `!` and the reason, and says which lines a deploy does not apply.
 

@@ -9,13 +9,16 @@ use App\Support\ApiException;
 use App\Support\Manifest;
 use App\Support\Project;
 
+use function Laravel\Prompts\confirm;
+
 /**
  * What brewless.yml asks of an environment's resources, carried out before a
  * deploy: the environment itself, its database, queue and bucket, and its
  * domains. Brewless makes only what is missing and refuses to switch what
  * stands; the refusals are printed with their line.
  *
- * Needs SetsEnvironmentsUp and ReportsManifestErrors next to it.
+ * Needs SetsEnvironmentsUp and ReportsManifestErrors next to it, and a
+ * --domains option on the command.
  */
 trait AppliesManifest
 {
@@ -75,15 +78,47 @@ trait AppliesManifest
             }
         }
 
+        // Let go by the first call; a second one finds nothing left to let go.
+        $released = (array) ($applied['released'] ?? []);
+        $missing = array_values(array_filter((array) ($applied['missing_domains'] ?? []), is_string(...)));
+
+        if ($missing !== [] && $this->addDomainsNow($slug, $missing)) {
+            $applied = $this->sendManifest($api, $application, $manifest, $slug, domains: true) ?: $applied;
+        } elseif ($missing !== []) {
+            $this->line('  Not added: '.implode(', ', $missing).'. Deploy with --domains to add them, or run: brewless domain:add '.$slug.' '.$missing[0]);
+        }
+
         foreach ($applied['domains'] ?? [] as $domain) {
             $this->line('  Adding the domain <options=bold>'.($domain['hostname'] ?? 'named in '.Project::FILE).'</>. It carries on after the deploy; its certificate comes once the DNS points the right way. See it under Domains in the console.');
         }
 
-        foreach ($applied['released'] ?? [] as $name) {
+        foreach ($released as $name) {
             $this->line('  '.$name.' is no longer part of '.$slug.'. It keeps running at Scaleway, and your variables still point at it until you change them.');
         }
 
         return true;
+    }
+
+    /**
+     * Adding a domain can move its visitors: when its DNS zone is in the
+     * customer's accounts, the record is pointed at Brewless. So it is asked
+     * first, or given with --domains; without a terminal it is not done.
+     *
+     * @param  list<string>  $missing
+     */
+    private function addDomainsNow(string $slug, array $missing): bool
+    {
+        if ($this->option('domains') === true) {
+            return true;
+        }
+
+        if (! $this->input->isInteractive()) {
+            return false;
+        }
+
+        $this->line('  '.Project::FILE.' names '.implode(', ', $missing).', which '.$slug.' does not answer on yet. Adding a domain points its DNS at Brewless when the zone is in your bunny.net or Scaleway account, so visitors may arrive at this environment.');
+
+        return confirm('Add '.(count($missing) === 1 ? 'it' : 'them').' now?', default: false);
     }
 
     /**
@@ -93,10 +128,10 @@ trait AppliesManifest
      * @param  array<string, mixed>  $application
      * @return array<string, mixed>|false|null
      */
-    private function sendManifest(Api $api, array $application, Manifest $manifest, string $slug): array|false|null
+    private function sendManifest(Api $api, array $application, Manifest $manifest, string $slug, bool $domains = false): array|false|null
     {
         try {
-            return $api->post('/api/applications/'.$application['id'].'/manifest/apply', ['environment' => $slug, 'manifest' => $manifest->data])['data'] ?? [];
+            return $api->post('/api/applications/'.$application['id'].'/manifest/apply', ['environment' => $slug, 'manifest' => $manifest->data, ...($domains ? ['domains' => true] : [])])['data'] ?? [];
         } catch (ApiException $exception) {
             if ($exception->status === 404) {
                 $this->components->warn('This Brewless does not set environments up from '.Project::FILE.' yet. The release is deployed to the environment as it stands.');

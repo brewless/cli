@@ -431,14 +431,16 @@ test('a set-up that fails deploys nothing', function (): void {
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/releases'));
 });
 
-test('domains the file adds and resources it lets go are said, and the release follows', function (): void {
+test('domains the environment lacks are added only after a yes or with --domains, because a domain can move visitors', function (array $arguments, ?bool $answer, bool $added): void {
     signedIn();
     repository();
     file_put_contents(getcwd().'/brewless.yml', "organisation: acme\napplication: shop\nenvironments:\n  production:\n    database: false\n    domains: [shop.example.eu]\n");
 
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
-        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['data' => applied(['domains' => [['hostname' => 'shop.example.eu', 'id' => 'op2', 'status' => 'queued']], 'released' => ['shop-main']])]),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => fn (Request $request) => Http::response(['data' => ($request['domains'] ?? false) === true
+            ? applied(['domains' => [['hostname' => 'shop.example.eu', 'id' => 'op2', 'status' => 'queued']]])
+            : applied(['missing_domains' => ['shop.example.eu'], 'released' => ['shop-main']])]),
         'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
@@ -446,12 +448,26 @@ test('domains the file adds and resources it lets go are said, and the release f
         'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
     ]);
 
-    $this->artisan('deploy', ['environment' => 'production'])
-        ->expectsOutputToContain('Adding the domain shop.example.eu.')
-        ->expectsOutputToContain('shop-main is no longer part of production. It keeps running at Scaleway')
+    $command = $this->artisan('deploy', ['environment' => 'production', ...$arguments]);
+
+    if ($answer !== null) {
+        $command->expectsConfirmation('Add it now?', $answer ? 'yes' : 'no');
+    }
+
+    $command->expectsOutputToContain('shop-main is no longer part of production. It keeps running at Scaleway')
+        ->expectsOutputToContain($added ? 'Adding the domain shop.example.eu.' : 'Not added: shop.example.eu. Deploy with --domains to add them')
         ->expectsOutputToContain('Release 2 is live.')
-        ->assertSuccessful();
-});
+        ->assertSuccessful()
+        ->run();
+
+    $asked = fn (Request $request): bool => str_ends_with($request->url(), '/manifest/apply') && ($request['domains'] ?? false) === true;
+    $added ? Http::assertSent($asked) : Http::assertNotSent($asked);
+})->with([
+    'a yes' => [[], true, true],
+    'a no' => [[], false, false],
+    'without a terminal' => [['--no-interaction' => true], null, false],
+    '--domains' => [['--domains' => true], null, true],
+]);
 
 test('a Brewless that does not set environments up from the file yet still deploys', function (): void {
     signedIn();
