@@ -87,3 +87,44 @@ test('logs that cannot be read say why', function (): void {
         ->expectsOutputToContain('The logs cannot be read right now (not_connected).')
         ->assertFailed();
 });
+
+test('logs of another container are read by its name', function (): void {
+    $sources = [['id' => 'res-web', 'name' => 'web', 'kind' => 'container'], ['id' => 'res-release', 'name' => 'release', 'kind' => 'container'], ['id' => 'res-worker', 'name' => 'worker', 'kind' => 'container']];
+
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env2/logs*' => fn (Request $request) => Http::response(['data' => ['sources' => $sources, 'unavailable' => null, 'lines' => [
+            ['id' => '1791300000000000001', 'at' => '2026-10-06T15:00:00Z', 'message' => ($request['source'] ?? null) === 'res-release' ? 'SQLSTATE[08006] fe_sendauth: no password supplied' : 'GET /up 200'],
+        ]]]),
+    ]);
+
+    $this->artisan('logs', ['environment' => 'staging', '--source' => 'release'])
+        ->expectsOutputToContain('fe_sendauth: no password supplied')
+        ->doesntExpectOutputToContain('GET /up 200')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/logs') && ($request['source'] ?? null) === 'res-release');
+});
+
+test('without a source the web container is read, and nothing else is asked for', function (): void {
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env2/logs*' => Http::response(['data' => ['sources' => [], 'unavailable' => null, 'lines' => []]]),
+    ]);
+
+    $this->artisan('logs', ['environment' => 'staging'])->assertSuccessful();
+
+    Http::assertSentCount(2);
+    Http::assertNotSent(fn (Request $request): bool => isset($request['source']));
+});
+
+test('a source the environment does not have names the ones it has', function (): void {
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env2/logs*' => Http::response(['data' => ['sources' => [['id' => 'res-web', 'name' => 'web', 'kind' => 'container'], ['id' => 'res-release', 'name' => 'release', 'kind' => 'container']], 'unavailable' => null, 'lines' => []]]),
+    ]);
+
+    $this->artisan('logs', ['environment' => 'staging', '--source' => 'worker'])
+        ->expectsOutputToContain('The environment has no logs named "worker". It has: web, release.')
+        ->assertFailed();
+});

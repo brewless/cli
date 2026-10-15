@@ -6,6 +6,7 @@ change how a command behaves.
 
 ## Unreleased
 
+- `logs --source=` reads the logs of another container or database of the environment, such as `release` or `worker`, by its name. Without it, `logs` reads the web container as before. A name the environment does not have is refused with the names it does have.
 - `deploy` and `rollback` show the step that is still running on a live line, with its seconds, what it waits for and when it is tried again, so a long image build no longer looks frozen. Without a terminal, or with `--no-interaction`, the output stays as it was.
 - `dns:list`, `dns:add`, `dns:update` and `dns:remove` read and change the records of the DNS zones Brewless manages for your environments, the same as the DNS page of the console. `dns:remove` asks first unless you pass `--force`.
 
