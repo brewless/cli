@@ -60,7 +60,7 @@ test('dns:list lists the zones, and with a zone its records', function (): void 
     ]);
 
     $this->artisan('dns:list')
-        ->expectsTable(['Zone', 'Used by'], [['example.eu', 'Shop · Production']])
+        ->expectsTable(['Zone', 'DNS', 'Used by'], [['example.eu', 'Bunny DNS', 'Shop · Production']])
         ->assertSuccessful();
 
     $this->artisan('dns:list', ['zone' => 'Example.eu.'])
@@ -130,7 +130,7 @@ test('dns:update refuses a record brewless does not set, before asking the serve
     ]);
 
     $this->artisan('dns:update', ['zone' => 'example.eu', 'id' => '2', '--value' => 'other'])
-        ->expectsOutputToContain('PULL ZONE records are changed at bunny.net')
+        ->expectsOutputToContain('PULL ZONE records are changed at the DNS provider')
         ->assertFailed();
 
     Http::assertNotSent(fn (Request $request): bool => $request->method() === 'PUT');

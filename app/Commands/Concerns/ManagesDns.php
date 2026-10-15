@@ -87,7 +87,7 @@ trait ManagesDns
         $type = strtolower((string) ($record['type'] ?? ''));
 
         if (! in_array($type, self::EDITABLE_TYPES, true)) {
-            throw new RuntimeException('Brewless can set '.strtoupper(implode(', ', self::EDITABLE_TYPES)).' records; '.str_replace('_', ' ', strtoupper($type)).' records are changed at bunny.net.');
+            throw new RuntimeException('Brewless can set '.strtoupper(implode(', ', self::EDITABLE_TYPES)).' records; '.str_replace('_', ' ', strtoupper($type)).' records are changed at the DNS provider.');
         }
 
         $fields = ['type' => $type, 'name' => ($record['name'] ?? '') === '' ? '@' : (string) $record['name'], 'value' => (string) ($record['value'] ?? ''), 'ttl' => (int) ($record['ttl'] ?? 300)];

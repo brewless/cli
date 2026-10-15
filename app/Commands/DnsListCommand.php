@@ -48,7 +48,7 @@ final class DnsListCommand extends Command
                 $this->describe($record),
                 $record['ttl'],
                 // Said once per record that cannot be changed from here, and why.
-                $record['editable'] ? '' : (($record['linked_to'] ?? null) !== null ? 'domain of an environment' : 'changed at bunny.net'),
+                $record['editable'] ? '' : (($record['linked_to'] ?? null) !== null ? 'domain of an environment' : 'changed at '.($zone['zone']['provider_label'] ?? 'the DNS provider')),
             ], $zone['records']));
 
             return self::SUCCESS;
@@ -61,19 +61,21 @@ final class DnsListCommand extends Command
     private function zones(array $answer): int
     {
         if (($answer['connected'] ?? true) === false) {
-            $this->components->warn('bunny.net is not connected to this organisation, so no zone can be read.');
+            $this->components->warn('No DNS provider is connected to this organisation, so no zone can be read. Connect bunny.net or Scaleway under Providers in the console.');
         }
 
         $zones = $answer['data'] ?? [];
 
         if ($zones === []) {
-            $this->components->info('Brewless manages no DNS zone yet. Take a zone at Bunny DNS over on the Resources page of an environment in the console.');
+            $this->components->info('Brewless manages no DNS zone yet. Take a zone at Bunny DNS or Scaleway DNS over on the Resources page of an environment in the console.');
 
             return self::SUCCESS;
         }
 
-        $this->table(['Zone', 'Used by'], array_map(static fn (array $zone): array => [
+        $this->table(['Zone', 'DNS', 'Used by'], array_map(static fn (array $zone): array => [
             $zone['name'],
+            // Where the zone lives: Bunny DNS or Scaleway DNS.
+            $zone['provider_label'] ?? 'Bunny DNS',
             implode(', ', array_map(static fn (array $environment): string => $environment['application'].' · '.$environment['name'], $zone['environments'] ?? [])),
         ], $zones));
 
