@@ -14,9 +14,10 @@ final class EnvPullCommand extends Command
     use TalksToBrewless;
 
     protected $signature = 'env:pull {environment : The environment whose variables to fetch}
-        {--file= : Where to write them; .env.<environment> when left out}';
+        {--file= : Where to write them; .env.<environment> when left out}
+        {--direct : Read them at Scaleway with a key of your own, so the values never pass through Brewless}';
 
-    protected $description = 'Fetch an environment\'s variables from your own Secret Manager';
+    protected $description = 'Fetch an environment\'s variables from your Secret Manager';
 
     public function handle(): int
     {
@@ -25,14 +26,21 @@ final class EnvPullCommand extends Command
             $api = $this->api($project->organisation);
             $slug = (string) $this->argument('environment');
             ['environment' => $environment] = $this->environment($api, $project, $slug);
-
-            // Brewless only says where the variables are kept. They are read at Scaleway with your own key.
-            $state = $api->get('/api/environments/'.$environment['id'].'/secrets')['data'] ?? [];
-            $secrets = new SecretManager(SecretManager::key(), (string) $state['secret']['region'], (string) $state['secret']['project_id']);
-
-            $id = $secrets->find((string) $state['secret']['name']);
-            $latest = $id === null ? null : $secrets->latest($id);
             $path = EnvFile::path((string) getcwd(), $slug, $this->option('file'));
+
+            if ($this->option('direct')) {
+                // Brewless only says where the variables are kept. They are read at Scaleway with your own key.
+                $state = $api->get('/api/environments/'.$environment['id'].'/secrets')['data'] ?? [];
+                $secrets = new SecretManager(SecretManager::key(), (string) $state['secret']['region'], (string) $state['secret']['project_id']);
+                $id = $secrets->find((string) $state['secret']['name']);
+                $latest = $id === null ? null : $secrets->latest($id);
+                $secret = (string) $state['secret']['name'];
+            } else {
+                // Brewless reads them from your Secret Manager with the connection it has, and passes them on without keeping them.
+                $file = $api->get('/api/environments/'.$environment['id'].'/env-file', ['via' => 'cli'])['data'] ?? [];
+                $latest = is_int($file['revision'] ?? null) ? ['revision' => $file['revision'], 'content' => (string) $file['content']] : null;
+                $secret = (string) ($file['secret'] ?? '');
+            }
 
             if ($latest === null) {
                 $this->components->info('No variables have been pushed for '.$slug.' yet.');
@@ -44,7 +52,7 @@ final class EnvPullCommand extends Command
             // Created empty with the right mode first, so the values are never in a file others can read.
             touch($path);
             chmod($path, 0600);
-            file_put_contents($path, EnvFile::withHeader($latest['content'], $latest['revision'], (string) $state['secret']['name']));
+            file_put_contents($path, EnvFile::withHeader($latest['content'], $latest['revision'], $secret));
 
             $this->components->info('Wrote revision '.$latest['revision'].' ('.count(EnvFile::names($latest['content'])).' variables) to '.basename($path).'.');
             $this->line('  It holds secrets: keep it out of git.');

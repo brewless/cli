@@ -46,10 +46,10 @@ afterEach(function (): void {
     putenv('SCW_SECRET_KEY');
 });
 
-test('pull reads the variables at scaleway with your own key and notes the revision in the file', function (): void {
+test('with --direct, pull reads the variables at scaleway with your own key and notes the revision in the file', function (): void {
     vault(['revision' => 7, 'content' => 'API_KEY="'.SECRET."\"\nAPP_NAME=Shop\n"]);
 
-    $this->artisan('env:pull', ['environment' => 'production'])
+    $this->artisan('env:pull', ['environment' => 'production', '--direct' => true])
         ->expectsOutputToContain('Wrote revision 7 (2 variables) to .env.production.')
         ->assertSuccessful();
 
@@ -64,21 +64,21 @@ test('pull reads the variables at scaleway with your own key and notes the revis
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'brewless.eu') && $request->hasHeader('X-Auth-Token'));
 });
 
-test('pull says so when nothing was pushed yet', function (): void {
+test('with --direct, pull says so when nothing was pushed yet', function (): void {
     vault(null);
 
-    $this->artisan('env:pull', ['environment' => 'production'])
+    $this->artisan('env:pull', ['environment' => 'production', '--direct' => true])
         ->expectsOutputToContain('No variables have been pushed for production yet.')
         ->assertSuccessful();
 
     expect(is_file($this->project.'/.env.production'))->toBeFalse();
 });
 
-test('push writes a new version at scaleway and tells brewless the names only', function (): void {
+test('with --direct, push writes a new version at scaleway and tells brewless the names only', function (): void {
     vault(['revision' => 7, 'content' => "API_KEY=old\n"], next: 8);
     file_put_contents($this->project.'/.env.production', "# brewless: revision 7 of shop-production-env. Keep this line; it tells a push what you started from.\nAPI_KEY=\"".SECRET."\"\nAPP_NAME=Shop\n");
 
-    $this->artisan('env:push', ['environment' => 'production'])
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])
         ->expectsOutputToContain('Pushed revision 8 (2 variables) to your Secret Manager.')
         ->expectsOutputToContain('brewless deploy production')
         ->assertSuccessful();
@@ -99,11 +99,11 @@ test('push writes a new version at scaleway and tells brewless the names only', 
     }
 });
 
-test('push refuses to overwrite a revision the file was not pulled at', function (string $header, string $expected): void {
+test('with --direct, push refuses to overwrite a revision the file was not pulled at', function (string $header, string $expected): void {
     vault(['revision' => 9, 'content' => "API_KEY=theirs\n"], next: 10);
     file_put_contents($this->project.'/.env.production', $header."API_KEY=mine\n");
 
-    $this->artisan('env:push', ['environment' => 'production'])
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])
         ->expectsOutputToContain($expected)
         ->assertFailed();
 
@@ -114,47 +114,47 @@ test('push refuses to overwrite a revision the file was not pulled at', function
     'never pulled' => ['', 'at revision 9 and this file was not pulled'],
 ]);
 
-test('push names the variables it would remove and asks before it does', function (): void {
+test('with --direct, push names the variables it would remove and asks before it does', function (): void {
     vault(['revision' => 7, 'content' => "API_KEY=x\nDB_PASSWORD=y\nMAIL_KEY=z\n"], next: 8);
     file_put_contents($this->project.'/.env.production', "# brewless: revision 7 of shop-production-env.\nAPI_KEY=x\n");
 
-    $this->artisan('env:push', ['environment' => 'production'])
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])
         ->expectsOutputToContain('This push removes 2 variables: DB_PASSWORD, MAIL_KEY')
         ->expectsConfirmation('Remove them from production?', 'no')
         ->assertSuccessful();
 
     expect(pushedToBrewless())->toBeNull();
 
-    $this->artisan('env:push', ['environment' => 'production'])
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])
         ->expectsConfirmation('Remove them from production?', 'yes')
         ->expectsOutputToContain('Pushed revision 8 (1 variables)')
         ->assertSuccessful();
 });
 
-test('the first push creates the secret', function (): void {
+test('with --direct, the first push creates the secret', function (): void {
     vault(null, next: 1);
     file_put_contents($this->project.'/.env.production', "API_KEY=x\n");
 
-    $this->artisan('env:push', ['environment' => 'production'])->expectsOutputToContain('Pushed revision 1')->assertSuccessful();
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])->expectsOutputToContain('Pushed revision 1')->assertSuccessful();
 
     Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && str_ends_with($request->url(), '/regions/fr-par/secrets') && $request['name'] === 'shop-production-env' && $request['path'] === '/brewless');
 
 });
 
-test('an unchanged file pushes nothing', function (): void {
+test('with --direct, an unchanged file pushes nothing', function (): void {
     vault(['revision' => 1, 'content' => "API_KEY=x\n"], next: 2);
     file_put_contents($this->project.'/.env.production', "# brewless: revision 1 of shop-production-env.\nAPI_KEY=x\n");
 
-    $this->artisan('env:push', ['environment' => 'production'])->expectsOutputToContain('Nothing changed: production is at revision 1 already.')->assertSuccessful();
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])->expectsOutputToContain('Nothing changed: production is at revision 1 already.')->assertSuccessful();
 
     expect(pushedToBrewless())->toBeNull();
 });
 
-test('an empty file removes every variable and is stored as a comment, because a version cannot be empty', function (): void {
+test('with --direct, an empty file removes every variable and is stored as a comment, because a version cannot be empty', function (): void {
     vault(['revision' => 7, 'content' => "API_KEY=x\n"], next: 8);
     file_put_contents($this->project.'/.env.production', "# brewless: revision 7 of shop-production-env.\n");
 
-    $this->artisan('env:push', ['environment' => 'production', '--force' => true])
+    $this->artisan('env:push', ['environment' => 'production', '--force' => true, '--direct' => true])
         ->expectsOutputToContain('Pushed revision 8 (0 variables)')
         ->assertSuccessful();
 
@@ -166,16 +166,141 @@ test('an empty file removes every variable and is stored as a comment, because a
 test('a file that is no dotenv file, a missing file and a missing scaleway key are each said plainly', function (): void {
     vault(null);
 
-    $this->artisan('env:push', ['environment' => 'production'])->expectsOutputToContain('Run: brewless env:pull production')->assertFailed();
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])->expectsOutputToContain('Run: brewless env:pull production')->assertFailed();
 
     file_put_contents($this->project.'/.env.production', "this is = not valid \"\n");
-    $this->artisan('env:push', ['environment' => 'production'])->expectsOutputToContain('not a valid dotenv file')->assertFailed();
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])->expectsOutputToContain('not a valid dotenv file')->assertFailed();
 
     file_put_contents($this->project.'/.env.production', "API_KEY=x\n");
     putenv('SCW_SECRET_KEY');
     putenv('SCW_CONFIG_PATH='.$this->home.'/none.yaml');
 
-    $this->artisan('env:push', ['environment' => 'production'])->expectsOutputToContain('No Scaleway key on this machine.')->assertFailed();
+    $this->artisan('env:push', ['environment' => 'production', '--direct' => true])->expectsOutputToContain('No Scaleway key on this machine.')->assertFailed();
 
     putenv('SCW_CONFIG_PATH');
+});
+
+// Through Brewless, the default: no Scaleway key on this machine
+
+/**
+ * Brewless as the two commands meet it when it reads and writes the file
+ * for them. `$file` is what the file endpoint answers; `$recorded` what
+ * Brewless knows of the latest revision.
+ *
+ * @param  array{revision: int|null, content: string|null}  $file
+ * @param  array{revision: int|null, keys: list<string>}  $recorded
+ * @param  array<string, mixed>|int  $put  the answer to a push, or a status to refuse it with
+ */
+function throughBrewless(array $file, array $recorded = ['revision' => null, 'keys' => []], array|int $put = []): void
+{
+    putenv('SCW_SECRET_KEY');
+    putenv('SCW_CONFIG_PATH=/nowhere/config.yaml');
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/environments/env1/secrets' => Http::response(['data' => [
+            'secret' => ['name' => 'shop-production-env', 'path' => '/brewless', 'region' => 'fr-par', 'project_id' => 'project-1'],
+            ...$recorded,
+        ]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/env-file*' => fn (Request $request) => $request->method() === 'GET'
+            ? Http::response(['data' => $file + ['secret' => 'shop-production-env']])
+            : (is_int($put) ? Http::response(['message' => 'refused', 'errors' => ['revision' => ['The variables are at revision 9 now, and these changes were made to revision 7. Fetch them again first.']]], $put) : Http::response($put)),
+        'https://api.scaleway.com/*' => Http::response(['message' => 'must not be called'], 500),
+    ]);
+}
+
+function pushedFile(): ?Request
+{
+    return Http::recorded(fn (Request $request): bool => $request->method() === 'PUT' && str_ends_with($request->url(), '/environments/env1/env-file'))->first()[0] ?? null;
+}
+
+test('pull fetches the file through brewless, without a scaleway key on this machine', function (): void {
+    throughBrewless(['revision' => 7, 'content' => "# Mail\nAPI_KEY=\"".SECRET."\"\nAPP_NAME=Shop\n"]);
+
+    $this->artisan('env:pull', ['environment' => 'production'])
+        ->expectsOutputToContain('Wrote revision 7 (2 variables) to .env.production.')
+        ->assertSuccessful();
+
+    $file = $this->project.'/.env.production';
+
+    expect(file_get_contents($file))->toStartWith('# brewless: revision 7 of shop-production-env.')
+        ->and(file_get_contents($file))->toContain("# Mail\nAPI_KEY=\"".SECRET.'"')
+        ->and(substr(sprintf('%o', fileperms($file)), -4))->toBe('0600');
+
+    Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/env-file') && $request['via'] === 'cli');
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'api.scaleway.com'));
+});
+
+test('pull through brewless says so when nothing was pushed yet', function (): void {
+    throughBrewless(['revision' => null, 'content' => null]);
+
+    $this->artisan('env:pull', ['environment' => 'production'])
+        ->expectsOutputToContain('No variables have been pushed for production yet.')
+        ->assertSuccessful();
+
+    expect(is_file($this->project.'/.env.production'))->toBeFalse();
+});
+
+test('push sends the file to brewless with the revision it was pulled at', function (): void {
+    throughBrewless(
+        ['revision' => 7, 'content' => "API_KEY=old\n"],
+        ['revision' => 7, 'keys' => ['API_KEY']],
+        ['data' => ['revision' => 8, 'keys' => ['API_KEY', 'APP_NAME']], 'changed' => true],
+    );
+    file_put_contents($this->project.'/.env.production', "# brewless: revision 7 of shop-production-env. Keep this line; it tells a push what you started from.\nAPI_KEY=\"".SECRET."\"\nAPP_NAME=Shop\n");
+
+    $this->artisan('env:push', ['environment' => 'production'])
+        ->expectsOutputToContain('Pushed revision 8 (2 variables) to your Secret Manager.')
+        ->expectsOutputToContain('brewless deploy production')
+        ->assertSuccessful();
+
+    expect(pushedFile()?->data())->toBe(['content' => 'API_KEY="'.SECRET."\"\nAPP_NAME=Shop\n", 'base_revision' => 7, 'force' => false, 'via' => 'cli'])
+        ->and(file_get_contents($this->project.'/.env.production'))->toStartWith('# brewless: revision 8 of shop-production-env.');
+
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'api.scaleway.com'));
+});
+
+test('push through brewless refuses a file that was not pulled at the latest revision, and asks before removing', function (): void {
+    throughBrewless(['revision' => 9, 'content' => ''], ['revision' => 9, 'keys' => ['API_KEY', 'MAIL_KEY']], ['data' => ['revision' => 10], 'changed' => true]);
+    file_put_contents($this->project.'/.env.production', "# brewless: revision 7 of shop-production-env.\nAPI_KEY=mine\n");
+
+    $this->artisan('env:push', ['environment' => 'production'])
+        ->expectsOutputToContain('at revision 9 and this file was pulled at revision 7')
+        ->assertFailed();
+
+    file_put_contents($this->project.'/.env.production', "# brewless: revision 9 of shop-production-env.\nAPI_KEY=mine\n");
+
+    $this->artisan('env:push', ['environment' => 'production'])
+        ->expectsOutputToContain('This push removes 1 variable: MAIL_KEY')
+        ->expectsConfirmation('Remove it from production?', 'no')
+        ->assertSuccessful();
+
+    expect(pushedFile())->toBeNull();
+});
+
+test('what brewless refuses is said as brewless says it', function (): void {
+    throughBrewless(['revision' => 7, 'content' => ''], ['revision' => 7, 'keys' => ['API_KEY']], 422);
+    file_put_contents($this->project.'/.env.production', "# brewless: revision 7 of shop-production-env.\nAPI_KEY=x\n");
+
+    $this->artisan('env:push', ['environment' => 'production'])
+        ->expectsOutputToContain('The variables are at revision 9 now')
+        ->assertFailed();
+});
+
+test('an unchanged file pushed through brewless is said to be unchanged', function (): void {
+    file_put_contents($this->project.'/.env.production', "# brewless: revision 7 of shop-production-env.\nAPI_KEY=x\n");
+    throughBrewless(['revision' => 7, 'content' => ''], ['revision' => 7, 'keys' => ['API_KEY']], ['data' => ['revision' => 7], 'changed' => false]);
+
+    $this->artisan('env:push', ['environment' => 'production'])
+        ->expectsOutputToContain('Nothing changed: production is at revision 7 already.')
+        ->assertSuccessful();
+});
+
+test('push --force through brewless says so, so brewless writes over a newer revision', function (): void {
+    throughBrewless(['revision' => 9, 'content' => ''], ['revision' => 9, 'keys' => ['API_KEY']], ['data' => ['revision' => 10], 'changed' => true]);
+    file_put_contents($this->project.'/.env.production', "API_KEY=mine\n");
+
+    $this->artisan('env:push', ['environment' => 'production', '--force' => true])->expectsOutputToContain('Pushed revision 10')->assertSuccessful();
+
+    expect(pushedFile()?->data())->toMatchArray(['base_revision' => null, 'force' => true]);
 });
