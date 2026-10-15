@@ -76,4 +76,19 @@ trait TalksToBrewless
             return self::FAILURE;
         }
     }
+
+    /**
+     * What Brewless wants the customer to know after an operation, as it
+     * wrote it: each one as its own paragraph.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    protected function notices(array $result): void
+    {
+        foreach (is_array($result['notices'] ?? null) ? $result['notices'] : [] as $notice) {
+            if (is_string($notice) && $notice !== '') {
+                $this->components->warn($notice);
+            }
+        }
+    }
 }

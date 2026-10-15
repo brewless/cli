@@ -251,6 +251,9 @@ trait FollowsReleases
             $this->line('  '.$address);
         }
 
+        $result = $release['operation']['result'] ?? null;
+        $this->notices(is_array($result) ? $result : []);
+
         return true;
     }
 }

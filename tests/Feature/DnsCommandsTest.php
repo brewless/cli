@@ -157,6 +157,19 @@ test('dns:remove asks first, and removes only after a yes', function (): void {
     Http::assertSent(fn (Request $request): bool => $request->method() === 'DELETE' && str_ends_with($request->url(), '/dns/z1/records/5'));
 });
 
+test('dns:remove that cannot ask refuses without --force instead of saying nothing was removed', function (): void {
+    Http::fake([
+        '*/cli/api/dns' => Http::response(dnsZones()),
+        '*/cli/api/dns/z1' => Http::response(dnsZone([dnsRecord(['id' => 5, 'name' => 'www'])])),
+    ]);
+
+    $this->artisan('dns:remove', ['zone' => 'example.eu', 'id' => '5', '--no-interaction' => true])
+        ->expectsOutputToContain('Pass --force to remove A www.example.eu → 203.0.113.7 without being asked.')
+        ->assertFailed();
+
+    Http::assertNotSent(fn (Request $request): bool => $request->method() === 'DELETE');
+});
+
 test('an unknown record id says where the ids are', function (): void {
     Http::fake([
         '*/cli/api/dns' => Http::response(dnsZones()),

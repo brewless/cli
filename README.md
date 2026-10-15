@@ -73,7 +73,7 @@ brewless dns:list example.eu                         # the records of one zone, 
 brewless dns:add example.eu a www 203.0.113.7        # add a record; @ is the domain itself
 brewless dns:add example.eu mx @ mx.example.eu --priority=10
 brewless dns:update example.eu 1234 --value=203.0.113.8 # change what you give, keep the rest
-brewless dns:remove example.eu 1234                  # remove a record
+brewless dns:remove example.eu 1234                  # remove a record (asks first; --force to skip)
 ```
 
 ## What init asks

@@ -4,6 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `dns:remove` with `--no-interaction` and without `--force` fails and says to pass `--force`. It used to print "Nothing was removed." and end successfully, because it could not ask.
+- `domain:add` and `deploy` print what Brewless wants you to know after the operation, such as a DNS zone it took over for the domain, or `APP_URL` still naming the provider's address. After a new domain, `domain:add` offers to set `APP_URL` to it; it is only changed after a yes, and takes effect with the next deploy.
+
 ## 0.5.0 (2026-10-15)
 
 - `logs --source=` reads the logs of another container or database of the environment, such as `release` or `worker`, by its name. Without it, `logs` reads the web container as before. A name the environment does not have is refused with the names it does have.

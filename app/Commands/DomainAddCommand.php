@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Commands;
 
 use App\Commands\Concerns\TalksToBrewless;
+use App\Support\Api;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
@@ -85,7 +86,36 @@ final class DomainAddCommand extends Command
 
             $this->components->info('https://'.$hostname.' is live on '.$this->argument('environment').'.');
 
+            $result = is_array($operation['result'] ?? null) ? $operation['result'] : [];
+            $this->notices($result);
+            $this->offerAddress($api, $environment, $result);
+
             return self::SUCCESS;
         });
+    }
+
+    /**
+     * Brewless suggests the address the application should call its own, now
+     * that it answers on a domain. It is only set after a yes: an
+     * application's own address is the customer's to change.
+     *
+     * @param  array<string, mixed>  $environment
+     * @param  array<string, mixed>  $result
+     */
+    private function offerAddress(Api $api, array $environment, array $result): void
+    {
+        $address = $result['address'] ?? null;
+
+        if (! is_array($address) || ! is_string($address['variable'] ?? null) || ! is_string($address['suggested'] ?? null) || ! $this->input->isInteractive()) {
+            return;
+        }
+
+        if (! $this->confirm('Set '.$address['variable'].' to '.$address['suggested'].' now? It takes effect with the next deploy.')) {
+            return;
+        }
+
+        $api->put('/api/environments/'.$environment['id'].'/secrets/'.$address['variable'], ['value' => $address['suggested']]);
+
+        $this->components->info($address['variable'].' is '.$address['suggested'].' now. Run brewless deploy '.$this->argument('environment').' to put it live.');
     }
 }
