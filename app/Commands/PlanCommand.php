@@ -23,7 +23,7 @@ final class PlanCommand extends Command
     protected $description = 'Show what brewless.yml asks for next to what stands now. Changes nothing';
 
     /** How a line of the plan starts, by what it would do. */
-    private const array MARKS = ['same' => '=', 'change' => '~', 'add' => '+', 'kept' => '·', 'unknown' => '?'];
+    private const array MARKS = ['same' => '=', 'change' => '~', 'add' => '+', 'kept' => '·', 'unknown' => '?', 'refused' => '!'];
 
     public function handle(): int
     {
@@ -64,7 +64,7 @@ final class PlanCommand extends Command
                 $this->newLine();
             }
 
-            $this->line('  <fg=gray>A deploy applies the PHP version. The rest is shown here so you can check it; Brewless does not change it from '.Project::FILE.' yet.</>');
+            $this->line('  <fg=gray>A deploy applies these lines, except those marked "not applied by a deploy yet". Removing a key from '.Project::FILE.' never removes anything.</>');
 
             return self::SUCCESS;
         });
@@ -85,10 +85,14 @@ final class PlanCommand extends Command
                 'change' => ($line['current'] ?? '–').' → '.($line['wanted'] ?? '–'),
                 'add' => ($line['key'] === 'environment' ? 'a new '.$line['wanted'].' environment' : 'add '.($line['wanted'] ?? '')),
                 'kept' => ($line['current'] ?? '').' is not in '.Project::FILE.'; it stays',
+                'refused' => ($line['wanted'] ?? '').': '.($line['reason'] ?? 'a deploy would refuse this'),
                 default => ($line['wanted'] ?? '').' (what stands cannot be read)',
             };
 
-            $this->line(sprintf('  %s %-24s %s', self::MARKS[$state] ?? '?', $line['key'], $what));
+            // What a deploy does not carry out yet is shown, and said to be only shown.
+            $note = ($line['applied_on_deploy'] ?? true) === false && ! in_array($state, ['same', 'kept'], true) ? ' <fg=gray>(not applied by a deploy yet)</>' : '';
+
+            $this->line(sprintf('  %s %-24s %s', self::MARKS[$state] ?? '?', $line['key'], $what).$note);
         }
 
         $this->newLine();
