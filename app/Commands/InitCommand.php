@@ -83,12 +83,24 @@ final class InitCommand extends Command
             }
 
             $php = $this->option('php') ?? $vapor?->php;
+            $project = new Project($organisation, (string) $slug, $framework, is_string($php) && $php !== '' ? $php : null);
 
-            (new Project($organisation, (string) $slug, $framework, is_string($php) && $php !== '' ? $php : null))->write($directory);
+            $project->write($directory, $vapor?->manifest($framework) ?? []);
 
             $this->components->info('Wrote brewless.yml. Commit it; it holds no secrets.');
 
+            if ($vapor instanceof Vapor) {
+                $this->carriedFromVapor($vapor, $framework);
+            }
+
             $added = $this->addEnvironments($api, $application, $vapor);
+
+            if ($vapor instanceof Vapor && $added !== []) {
+                // The environments that were added stand in a region now: the file says which.
+                $regions = array_column(array_filter($added, static fn (array $environment): bool => is_string($environment['region'] ?? null)), 'region', 'slug');
+                $project->write($directory, $vapor->manifest($framework, $regions));
+            }
+
             $ready = $added === [] ? [] : $this->setEnvironmentsUp($api, $added, $vapor);
 
             if ($vapor instanceof Vapor && $added !== []) {
@@ -248,6 +260,30 @@ final class InitCommand extends Command
         }
 
         return $ready;
+    }
+
+    /**
+     * What brewless.yml says now that it starts from vapor.yml, and what of
+     * vapor.yml it could not say, each once.
+     */
+    private function carriedFromVapor(Vapor $vapor, string $framework): void
+    {
+        $this->line('  It holds the environments of vapor.yml and their settings. See them next to what stands: brewless plan');
+
+        $warnings = $vapor->warnings($framework);
+
+        if ($warnings === []) {
+            return;
+        }
+
+        $this->newLine();
+        $this->line('  Not carried over from vapor.yml as it was:');
+
+        foreach ($warnings as $warning) {
+            $this->line('  - '.$warning);
+        }
+
+        $this->newLine();
     }
 
     /**

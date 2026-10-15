@@ -102,11 +102,16 @@ brewless init --application=shop --environments=production,staging --region=fr-p
 
 ### Coming from Laravel Vapor
 
-With a `vapor.yml` in the project, `init` offers to start from it: its
-environments, its PHP version, and for each environment a database, a queue
-and a bucket where Vapor had one. Nothing at Vapor or AWS is read or changed.
-Your variables, the data in your databases and the files in your buckets are
-yours to move; `init` lists them at the end.
+With a `vapor.yml` in the project, `init` offers to start from it
+(`--from-vapor` starts from it without asking). It writes a `brewless.yml` with
+every setting Brewless has a key for: the PHP version, memory and timeouts of
+the web, release and worker containers, warm containers and concurrency as
+replicas, the queues, the scheduler, build steps Brewless does not run already,
+deploy hooks as release commands, and per environment its database, queue,
+bucket and domains. What it cannot carry over is printed once, with what to do
+instead. Nothing at Vapor or AWS is read or changed. Your variables, the data
+in your databases and the files in your buckets are yours to move; `init` lists
+them at the end. `brewless plan` shows the file next to what stands.
 
 ## PHP version
 
