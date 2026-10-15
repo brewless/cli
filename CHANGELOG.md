@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `dns:list`, `dns:add`, `dns:update` and `dns:remove` read and change the records of the DNS zones Brewless manages for your environments, the same as the DNS page of the console. `dns:remove` asks first unless you pass `--force`.
+
 ## 0.4.0 (2026-10-15)
 
 - `env:pull` and `env:push` go through Brewless, with the connection your organisation already has: no Scaleway key is needed on your machine any more. The values pass through and are not kept. `--direct` keeps the old way, with a key of your own, so the values never pass through Brewless.

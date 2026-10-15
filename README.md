@@ -61,6 +61,21 @@ brewless export production   # everything Brewless knows, as a folder with Terra
 brewless detach production   # Brewless stops managing it; it keeps running
 ```
 
+### DNS
+
+The records of a zone at Bunny DNS that Brewless manages for one of your
+environments can be read and changed from here too. The ids come from
+`dns:list`; removing asks first unless you pass `--force`.
+
+```bash
+brewless dns:list                                    # the zones Brewless manages
+brewless dns:list example.eu                         # the records of one zone, with their ids
+brewless dns:add example.eu a www 203.0.113.7        # add a record; @ is the domain itself
+brewless dns:add example.eu mx @ mx.example.eu --priority=10
+brewless dns:update example.eu 1234 --value=203.0.113.8 # change what you give, keep the rest
+brewless dns:remove example.eu 1234                  # remove a record
+```
+
 ## What init asks
 
 `brewless init` writes `brewless.yml` (no secrets) and then asks what the

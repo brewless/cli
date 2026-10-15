@@ -32,6 +32,14 @@ final class Api
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function delete(string $path): array
+    {
+        return $this->answer(fn (PendingRequest $request): Response => $request->delete($this->baseUrl().$path));
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      */
