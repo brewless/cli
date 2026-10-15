@@ -266,3 +266,26 @@ test('deploy needs a brewless.yml, a sign-in and an environment that exists', fu
         ->expectsOutputToContain('has no environment "preview". It has: production, staging.')
         ->assertFailed();
 });
+
+test('a live release passes on what Brewless wants the customer to know', function (): void {
+    signedIn();
+    project();
+    repository();
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
+        'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => [
+            'steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers'),
+            'result' => ['notices' => ['APP_URL is still https://shop.b-cdn.net, the provider\'s own address.']],
+        ]])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->expectsOutputToContain('Release 2 is live.')
+        ->expectsOutputToContain('APP_URL is still https://shop.b-cdn.net')
+        ->assertSuccessful();
+});

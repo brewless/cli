@@ -29,6 +29,13 @@ final class DnsRemoveCommand extends Command
             $line = strtoupper((string) $record['type']).' '.$this->hostname($record, $zone['domain']).' → '.$this->describe($record);
 
             // Brewless keeps no copy of the zone: once removed, the record is gone.
+            // Without a terminal to ask in, a missing --force is a mistake, not a no.
+            if (! $this->option('force') && ! $this->input->isInteractive()) {
+                $this->components->error('Pass --force to remove '.$line.' without being asked.');
+
+                return self::FAILURE;
+            }
+
             if (! $this->option('force') && ! $this->confirm('Remove '.$line.'?')) {
                 $this->components->info('Nothing was removed.');
 

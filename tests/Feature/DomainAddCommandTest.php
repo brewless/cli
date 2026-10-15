@@ -5,9 +5,30 @@ declare(strict_types=1);
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 
-function domainOperation(string $status, array $steps, ?string $error = null): array
+function domainOperation(string $status, array $steps, ?string $error = null, array $result = []): array
 {
-    return ['data' => ['id' => 'op1', 'status' => $status, 'error_message' => $error, 'steps' => $steps]];
+    return ['data' => ['id' => 'op1', 'status' => $status, 'error_message' => $error, 'steps' => $steps, 'result' => $result]];
+}
+
+/**
+ * A domain that was added, with what Brewless wants the customer to know.
+ */
+function addedWithNotices(): array
+{
+    $done = [['name' => 'attach_domain', 'status' => 'succeeded'], ['name' => 'dns', 'status' => 'succeeded'], ['name' => 'certificate', 'status' => 'succeeded']];
+
+    return [
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env1/domains' => Http::sequence()
+            ->push(['data' => ['route' => 'bunny', 'target' => 'shop.b-cdn.net', 'domains' => []]])
+            ->push(domainOperation('succeeded', $done, null, [
+                'zone' => 'example.eu',
+                'zone_taken_over' => true,
+                'address' => ['variable' => 'APP_URL', 'current' => 'https://shop.b-cdn.net', 'suggested' => 'https://example.eu'],
+                'notices' => ['Brewless now manages the DNS zone example.eu at Bunny DNS for this environment.', 'APP_URL is still https://shop.b-cdn.net, the provider\'s own address.'],
+            ]), 201),
+        '*/environments/env1/secrets/APP_URL' => Http::response(['data' => ['revision' => 3]]),
+    ];
 }
 
 beforeEach(function (): void {
@@ -48,4 +69,37 @@ test('a domain that cannot be added says why and fails', function (): void {
     $this->artisan('domain:add', ['environment' => 'production', 'hostname' => 'docs.example.eu'])
         ->expectsOutputToContain('already has an address record')
         ->assertFailed();
+});
+
+test('domain:add tells what Brewless took over and offers to set the address, which then takes a deploy', function (): void {
+    Http::fake(addedWithNotices());
+
+    $this->artisan('domain:add', ['environment' => 'production', 'hostname' => 'example.eu'])
+        ->expectsOutputToContain('Brewless now manages the DNS zone example.eu')
+        ->expectsOutputToContain('APP_URL is still https://shop.b-cdn.net')
+        ->expectsConfirmation('Set APP_URL to https://example.eu now? It takes effect with the next deploy.', 'yes')
+        ->expectsOutputToContain('APP_URL is https://example.eu now. Run brewless deploy production to put it live.')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'PUT' && str_ends_with($request->url(), '/environments/env1/secrets/APP_URL') && $request['value'] === 'https://example.eu');
+});
+
+test('domain:add never sets the address without a yes', function (): void {
+    Http::fake(addedWithNotices());
+
+    $this->artisan('domain:add', ['environment' => 'production', 'hostname' => 'example.eu'])
+        ->expectsConfirmation('Set APP_URL to https://example.eu now? It takes effect with the next deploy.', 'no')
+        ->assertSuccessful();
+
+    Http::assertNotSent(fn (Request $request): bool => $request->method() === 'PUT');
+});
+
+test('domain:add without a terminal to ask in only says what to set', function (): void {
+    Http::fake(addedWithNotices());
+
+    $this->artisan('domain:add', ['environment' => 'production', 'hostname' => 'example.eu', '--no-interaction' => true])
+        ->expectsOutputToContain('APP_URL is still https://shop.b-cdn.net')
+        ->assertSuccessful();
+
+    Http::assertNotSent(fn (Request $request): bool => $request->method() === 'PUT');
 });
