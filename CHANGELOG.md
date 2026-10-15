@@ -4,6 +4,13 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `deploy` sends the whole `brewless.yml` along. Brewless applies sizes, scale, timeouts, `worker.queues`, `scheduler`, `build` and `release` steps and plain `variables` with the release (this needs Brewless with brewless.yml phase 2, and `brewless/laravel` 0.3 for `release`).
+- Before the release, `deploy` does what the file asks of the environment's resources: it makes an environment the file names that does not exist yet and sets it up, adds a database, queue or bucket it is missing, and adds its domains. It prints each step and what it let go after `false`. A Brewless that does not do this yet is told apart, and the release is deployed as before.
+- What Brewless refuses in the file at a deploy is printed with its line, and nothing is deployed.
+- `plan` marks lines a deploy would refuse with `!` and the reason, and says which lines a deploy does not apply.
+
 ## 0.7.0 (2026-10-15)
 
 - `plan` shows, per environment, what `brewless.yml` asks for next to what stands now: the same (`=`), a change (`~`), something to add (`+`), something the file leaves out that stays (`·`), and what cannot be read (`?`). It changes nothing. When Brewless refuses the file, every reason comes with the line it is on, and a file that is not valid YAML is named with its line before anything is sent.
