@@ -41,6 +41,15 @@ final class Api
     }
 
     /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    public function put(string $path, array $body = []): array
+    {
+        return $this->answer(fn (PendingRequest $request): Response => $request->put($this->baseUrl().$path, $body));
+    }
+
+    /**
      * @param  callable(PendingRequest): Response  $send
      * @return array<string, mixed>
      */
