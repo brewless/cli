@@ -198,6 +198,28 @@ trait FollowsReleases
     }
 
     /**
+     * The last lines of a build that failed, as Brewless kept them with the
+     * release (without anything secret), so the reason shows right here.
+     *
+     * @param  array<string, mixed>  $release
+     */
+    private function buildLog(array $release): void
+    {
+        $log = $release['build_output'] ?? null;
+
+        if (! is_string($log) || trim($log) === '') {
+            return;
+        }
+
+        $this->line('  Last lines of the build log:');
+
+        // What a build printed is text, not markup for the terminal.
+        foreach (explode("\n", $log) as $line) {
+            $this->line('  <fg=gray>'.OutputFormatter::escape($line).'</>');
+        }
+    }
+
+    /**
      * Say how a release ended. Returns whether it is live.
      *
      * @param  array<string, mixed>  $release
@@ -212,6 +234,8 @@ trait FollowsReleases
             if (is_string($release['migration_output'] ?? null) && $release['migration_output'] !== '') {
                 $this->line($release['migration_output']);
             }
+
+            $this->buildLog($release);
 
             return false;
         }

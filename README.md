@@ -125,7 +125,9 @@ can build are listed when you ask for one it cannot.
 2. The archive is uploaded straight into a private bucket of **your own**
    Scaleway project, through a link that works for fifteen minutes. The source
    does not pass through Brewless.
-3. A job in your project builds the image and pushes it to your registry.
+3. A job in your project builds the image and pushes it to your registry. When
+   the build fails, the client prints the last lines of its log under the error,
+   with anything secret left out.
 4. The release commands (migrations) run on the new image. If they fail,
    nothing changes for visitors.
 5. The web container switches to the new image and has to answer healthy,

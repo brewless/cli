@@ -164,6 +164,59 @@ test('a release that fails says why, shows what the release commands printed and
         ->assertFailed();
 });
 
+test('a failed build prints the last lines of its log under the error', function (): void {
+    signedIn();
+    project();
+    repository();
+
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/x', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        '*/environments/env1/releases' => Http::response(['data' => release([
+            'status' => 'failed',
+            'build_output' => "== source unpacked (1s)\n<error>npm error</error> Missing script: \"build\"",
+            'operation' => ['error_message' => 'The build failed. Nothing was changed for visitors.', 'steps' => [
+                ['name' => 'source', 'status' => 'succeeded'],
+                ['name' => 'build', 'status' => 'succeeded'],
+                ['name' => 'image', 'status' => 'failed'],
+            ]],
+        ])], 201),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->expectsOutputToContain('Image built and pushed')
+        ->expectsOutputToContain('Release 2 did not go live: The build failed.')
+        ->expectsOutputToContain('Last lines of the build log:')
+        ->expectsOutputToContain('== source unpacked (1s)')
+        // Printed as it was written: what looks like terminal markup is shown, not obeyed.
+        ->expectsOutputToContain('<error>npm error</error> Missing script: "build"')
+        ->assertFailed();
+});
+
+test('a release that fails before the build prints no build log', function (): void {
+    signedIn();
+    project();
+    repository();
+
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/x', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        '*/environments/env1/releases' => Http::response(['data' => release([
+            'status' => 'failed',
+            'build_output' => null,
+            'operation' => ['error_message' => 'The source of this commit is not in the project\'s bucket.', 'steps' => [
+                ['name' => 'source', 'status' => 'failed'],
+            ]],
+        ])], 201),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->doesntExpectOutputToContain('Last lines of the build log')
+        ->assertFailed();
+});
+
 test('a failed upload deploys nothing', function (): void {
     signedIn();
     project();
