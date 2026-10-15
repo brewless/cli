@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ReportsManifestErrors;
 use App\Commands\Concerns\TalksToBrewless;
 use App\Support\Api;
 use App\Support\ApiException;
@@ -14,6 +15,7 @@ use RuntimeException;
 
 final class PlanCommand extends Command
 {
+    use ReportsManifestErrors;
     use TalksToBrewless;
 
     protected $signature = 'plan {environment? : Only this environment; without it, every environment in brewless.yml}';
@@ -34,11 +36,9 @@ final class PlanCommand extends Command
             try {
                 $plan = $api->post('/api/applications/'.$application['id'].'/manifest/plan', ['manifest' => $manifest->data])['data'] ?? [];
             } catch (ApiException $exception) {
-                if ($exception->status !== 422 || $exception->errors === []) {
+                if (! $this->manifestRefused($manifest, $exception)) {
                     throw $exception;
                 }
-
-                $this->refused($manifest, $exception->errors);
 
                 return self::FAILURE;
             }
@@ -92,25 +92,6 @@ final class PlanCommand extends Command
         }
 
         $this->newLine();
-    }
-
-    /**
-     * What Brewless refused in the file, each with the line it is on.
-     *
-     * @param  array<string, list<string>>  $errors
-     */
-    private function refused(Manifest $manifest, array $errors): void
-    {
-        $this->components->error(Project::FILE.' cannot be used as it is.');
-
-        foreach ($errors as $field => $messages) {
-            $path = preg_replace('/^manifest\.?/', '', $field) ?? $field;
-            $line = $path === '' ? null : $manifest->lineOf($path);
-
-            foreach ($messages as $message) {
-                $this->line('  '.($line === null ? '' : '<fg=gray>line '.$line.':</> ').$message);
-            }
-        }
     }
 
     /**

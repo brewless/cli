@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Commands;
 
 use App\Commands\Concerns\FollowsReleases;
+use App\Commands\Concerns\ReportsManifestErrors;
 use App\Commands\Concerns\TalksToBrewless;
+use App\Support\ApiException;
 use App\Support\Git;
 use App\Support\Manifest;
 use Illuminate\Support\Facades\Http;
@@ -16,6 +18,7 @@ use RuntimeException;
 final class DeployCommand extends Command
 {
     use FollowsReleases;
+    use ReportsManifestErrors;
     use TalksToBrewless;
 
     protected $signature = 'deploy {environment? : The environment to deploy to, such as production; without it, default-environment in brewless.yml}';
@@ -26,8 +29,9 @@ final class DeployCommand extends Command
     {
         return $this->attempt(function (): int {
             $project = $this->project();
+            $manifest = Manifest::read((string) getcwd());
             $api = $this->api($project->organisation);
-            $slug = $this->argument('environment') ?? Manifest::read((string) getcwd())->defaultEnvironment()
+            $slug = $this->argument('environment') ?? $manifest->defaultEnvironment()
                 ?? throw new RuntimeException('Name the environment to deploy to, such as: brewless deploy production. Or set default-environment in brewless.yml.');
             $slug = (string) $slug;
             ['environment' => $environment] = $this->environment($api, $project, $slug);
@@ -64,14 +68,26 @@ final class DeployCommand extends Command
                 throw new RuntimeException('Uploading the source to your project failed (status '.$upload->status().'). Nothing was deployed.');
             }
 
-            $release = $api->post('/api/environments/'.$environment['id'].'/releases', [
-                'commit' => $commit,
-                'commit_time' => $git->commitTime(),
-                // One key per run of this command: a request that is sent twice starts one release.
-                'key' => 'cli-'.Str::lower(Str::random(24)),
-                // What brewless.yml asks for; without it Brewless builds for its default version.
-                ...($project->php === null ? [] : ['php' => $project->php]),
-            ])['data'] ?? [];
+            try {
+                $release = $api->post('/api/environments/'.$environment['id'].'/releases', [
+                    'commit' => $commit,
+                    'commit_time' => $git->commitTime(),
+                    // One key per run of this command: a request that is sent twice starts one release.
+                    'key' => 'cli-'.Str::lower(Str::random(24)),
+                    // What brewless.yml asks for; without it Brewless builds for its default version.
+                    ...($project->php === null ? [] : ['php' => $project->php]),
+                    // The whole file: Brewless applies what it asks of this environment with the release.
+                    'manifest' => $manifest->data,
+                ])['data'] ?? [];
+            } catch (ApiException $exception) {
+                if (! $this->manifestRefused($manifest, $exception)) {
+                    throw $exception;
+                }
+
+                $this->line('  Nothing was deployed.');
+
+                return self::FAILURE;
+            }
 
             $this->line('  Release '.$release['number'].(is_string($release['php_version'] ?? null) ? ', PHP '.$release['php_version'] : ''));
 

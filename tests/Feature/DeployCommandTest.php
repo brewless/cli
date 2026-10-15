@@ -289,3 +289,65 @@ test('a live release passes on what Brewless wants the customer to know', functi
         ->expectsOutputToContain('APP_URL is still https://shop.b-cdn.net')
         ->assertSuccessful();
 });
+
+test('deploy sends the whole of brewless.yml along, for Brewless to apply what it asks of the environment', function (): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', <<<'YAML'
+        organisation: acme
+        application: shop
+        framework: laravel
+        release:
+          - migrate --force
+        environments:
+          production:
+            web:
+              memory: 1024
+              max: 5
+            variables:
+              APP_LOCALE: nl
+        YAML);
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
+        'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/environments/env1/releases')
+        && $request['manifest']['release'] === ['migrate --force']
+        && $request['manifest']['environments']['production']['web'] === ['memory' => 1024, 'max' => 5]
+        && $request['manifest']['environments']['production']['variables'] === ['APP_LOCALE' => 'nl']);
+});
+
+test('what Brewless refuses in brewless.yml at a deploy is shown with its line, and nothing is deployed', function (): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', <<<'YAML'
+        organisation: acme
+        application: shop
+        environments:
+          production:
+            web:
+              memory: 4096
+              cpu: 500
+        YAML);
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['message' => 'invalid', 'errors' => ['manifest.environments.production.web.memory' => ['Give memory from 500 to 2000 megabytes with this cpu.']]], 422),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'production'])
+        ->expectsOutputToContain('brewless.yml cannot be used as it is.')
+        ->expectsOutputToContain('line 6: Give memory from 500 to 2000 megabytes with this cpu.')
+        ->expectsOutputToContain('Nothing was deployed.')
+        ->assertFailed();
+});
