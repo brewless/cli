@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use RuntimeException;
+use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -34,7 +35,11 @@ final class Project
             throw new RuntimeException('There is no '.self::FILE.' here. Run: brewless init');
         }
 
-        $data = Yaml::parseFile($directory.'/'.self::FILE);
+        try {
+            $data = Yaml::parseFile($directory.'/'.self::FILE);
+        } catch (ParseException $exception) {
+            throw new RuntimeException(self::FILE.' cannot be read on line '.$exception->getParsedLine().': '.$exception->getMessage());
+        }
 
         foreach (['organisation', 'application'] as $key) {
             if (! is_array($data) || ! is_string($data[$key] ?? null) || $data[$key] === '') {

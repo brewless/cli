@@ -12,7 +12,10 @@ use RuntimeException;
  */
 final class ApiException extends RuntimeException
 {
-    public function __construct(string $message, public readonly int $status, public readonly ?string $error = null)
+    /**
+     * @param  array<string, list<string>>  $errors  what the server said per field, for a 422
+     */
+    public function __construct(string $message, public readonly int $status, public readonly ?string $error = null, public readonly array $errors = [])
     {
         parent::__construct($message);
     }

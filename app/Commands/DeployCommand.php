@@ -7,6 +7,7 @@ namespace App\Commands;
 use App\Commands\Concerns\FollowsReleases;
 use App\Commands\Concerns\TalksToBrewless;
 use App\Support\Git;
+use App\Support\Manifest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
@@ -17,7 +18,7 @@ final class DeployCommand extends Command
     use FollowsReleases;
     use TalksToBrewless;
 
-    protected $signature = 'deploy {environment : The environment to deploy to, such as production}';
+    protected $signature = 'deploy {environment? : The environment to deploy to, such as production; without it, default-environment in brewless.yml}';
 
     protected $description = 'Deploy the current commit to an environment';
 
@@ -26,7 +27,9 @@ final class DeployCommand extends Command
         return $this->attempt(function (): int {
             $project = $this->project();
             $api = $this->api($project->organisation);
-            $slug = (string) $this->argument('environment');
+            $slug = $this->argument('environment') ?? Manifest::read((string) getcwd())->defaultEnvironment()
+                ?? throw new RuntimeException('Name the environment to deploy to, such as: brewless deploy production. Or set default-environment in brewless.yml.');
+            $slug = (string) $slug;
             ['environment' => $environment] = $this->environment($api, $project, $slug);
 
             $git = new Git((string) getcwd());

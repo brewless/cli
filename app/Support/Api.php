@@ -81,7 +81,7 @@ final class Api
             return is_array($json) ? $json : [];
         }
 
-        throw new ApiException($this->explain($response), $response->status(), is_string($response->json('error')) ? $response->json('error') : null);
+        throw new ApiException($this->explain($response), $response->status(), is_string($response->json('error')) ? $response->json('error') : null, $this->errors($response));
     }
 
     private function explain(Response $response): string
@@ -96,6 +96,24 @@ final class Api
                 ? $response->json('message')
                 : 'Brewless answered with an error ('.$response->status().'). Try again in a moment.',
         };
+    }
+
+    /**
+     * Every message the server gave per field, when it refused the request.
+     *
+     * @return array<string, list<string>>
+     */
+    private function errors(Response $response): array
+    {
+        $errors = [];
+
+        foreach (is_array($response->json('errors')) ? $response->json('errors') : [] as $field => $messages) {
+            if (is_array($messages)) {
+                $errors[(string) $field] = array_values(array_filter($messages, is_string(...)));
+            }
+        }
+
+        return $errors;
     }
 
     /**
