@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.6.0 (2026-10-15)
 
 - `dns:remove` with `--no-interaction` and without `--force` fails and says to pass `--force`. It used to print "Nothing was removed." and end successfully, because it could not ask.
 - `domain:add` and `deploy` print what Brewless wants you to know after the operation, such as a DNS zone it took over for the domain, or `APP_URL` still naming the provider's address. After a new domain, `domain:add` offers to set `APP_URL` to it; it is only changed after a yes, and takes effect with the next deploy.
