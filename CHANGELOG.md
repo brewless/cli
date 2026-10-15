@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.3.1 (2026-10-15)
 
 - `deploy` streams the packed commit to your bucket instead of reading it into memory, so a repository with large committed files (videos, for one) no longer stops with "Allowed memory size exhausted".
 
