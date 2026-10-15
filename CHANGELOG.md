@@ -4,6 +4,12 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.7.0 (2026-10-15)
+
+- `plan` shows, per environment, what `brewless.yml` asks for next to what stands now: the same (`=`), a change (`~`), something to add (`+`), something the file leaves out that stays (`·`), and what cannot be read (`?`). It changes nothing. When Brewless refuses the file, every reason comes with the line it is on, and a file that is not valid YAML is named with its line before anything is sent.
+- `deploy` without an environment deploys to `default-environment` from `brewless.yml`.
+- `dns:list` shows the DNS provider of each zone (Bunny DNS or Scaleway DNS), and the commands no longer name bunny.net where the zone may live at Scaleway DNS.
+
 ## 0.6.0 (2026-10-15)
 
 - `dns:remove` with `--no-interaction` and without `--force` fails and says to pass `--force`. It used to print "Nothing was removed." and end successfully, because it could not ask.
