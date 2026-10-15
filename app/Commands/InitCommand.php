@@ -104,7 +104,7 @@ final class InitCommand extends Command
             $ready = $added === [] ? [] : $this->setEnvironmentsUp($api, $added, $vapor);
 
             if ($vapor instanceof Vapor && $added !== []) {
-                $this->leftFromVapor($vapor, array_column($added, 'slug'));
+                $this->leftFromVapor($vapor, array_column($added, 'slug'), $ready);
             }
 
             $first = $ready[0] ?? $added[0]['slug'] ?? $application['environments'][0]['slug'] ?? '<environment>';
@@ -290,12 +290,18 @@ final class InitCommand extends Command
      * What a move from Vapor still asks of a person: Brewless does not read AWS.
      *
      * @param  list<string>  $environments
+     * @param  list<string>  $ready  the environments that are set up now
      */
-    private function leftFromVapor(Vapor $vapor, array $environments): void
+    private function leftFromVapor(Vapor $vapor, array $environments, array $ready): void
     {
         $this->newLine();
         $this->line('  Still yours to move from Vapor:');
-        $this->line('  - the variables: `vapor env:pull <environment>`, then `brewless env:push <environment>`');
+        // What Brewless wrote points at the new database, queue and bucket: the variables from Vapor are added to it, not put over it.
+        $this->line('  - the variables: `brewless env:pull <environment>`, add yours from Vapor, then `brewless env:push <environment>`');
+
+        if (array_any($ready, static fn (string $name): bool => ($vapor->environments[$name]['database'] ?? false) || ($vapor->environments[$name]['bucket'] ?? false))) {
+            $this->line('  - brewless.yml names the databases and buckets as vapor.yml does; the ones made now have names of their own. `brewless plan` shows both: write the names that stand in brewless.yml');
+        }
 
         if (array_any($environments, static fn (string $name): bool => $vapor->environments[$name]['database'] ?? false)) {
             $this->line('  - the data in your databases: the new ones are empty');

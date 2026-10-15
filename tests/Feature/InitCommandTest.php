@@ -147,7 +147,11 @@ test('a vapor.yml can be the starting point: its environments, its PHP version a
         ->expectsQuestion('In which region?', 'fr-par')
         ->expectsConfirmation('Make this now?', 'yes')
         ->expectsOutputToContain('brewless domain:add production privasearch.example')
+        ->expectsOutputToContain('`brewless env:pull <environment>`, add yours from Vapor, then `brewless env:push <environment>`')
+        ->expectsOutputToContain('brewless.yml names the databases and buckets as vapor.yml does')
         ->assertSuccessful();
+
+    expect(Yaml::parseFile($this->project.'/brewless.yml')['environments']['production'])->toMatchArray(['region' => 'fr-par', 'database' => 'privasearch-db', 'storage' => 'privasearch-files', 'domains' => ['privasearch.example']]);
 
     expect(Project::read($this->project)->php)->toBe('8.3');
 
