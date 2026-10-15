@@ -45,7 +45,16 @@ test('deploy uploads the commit to the customer project, starts a release and fo
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
         'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
-        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://bucket.s3.fr-par.scw.cloud/*' => function (Request $request) use (&$upload) {
+            // Read while the command still holds the file open.
+            $upload = [
+                'body' => $request->body(),
+                'streamed' => str_ends_with((string) $request->toPsrRequest()->getBody()->getMetadata('uri'), '.tar.gz'),
+                'size' => $request->toPsrRequest()->getBody()->getSize(),
+            ];
+
+            return Http::response('', 200);
+        },
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::sequence()
             ->push(['data' => release(['status' => 'building', 'operation' => ['steps' => steps('source', 'build')]])])
@@ -64,8 +73,10 @@ test('deploy uploads the commit to the customer project, starts a release and fo
     // The source went to the bucket, not to Brewless, and carried no token.
     Http::assertSent(fn (Request $request): bool => $request->method() === 'PUT'
         && str_starts_with($request->url(), 'https://bucket.s3.fr-par.scw.cloud/')
-        && $request->body() === 'the source'
         && ! $request->hasHeader('Authorization'));
+
+    // Streamed from the packed file rather than read into memory, with a known size: the bucket takes no chunked upload.
+    expect($upload)->toBe(['body' => 'the source', 'streamed' => true, 'size' => strlen('the source')]);
 
     Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
         && str_ends_with($request->url(), '/environments/env1/releases')
