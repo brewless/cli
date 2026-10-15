@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Commands\Concerns;
 
 use App\Support\Api;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Sleep;
+use Symfony\Component\Console\Formatter\OutputFormatter;
+use Symfony\Component\Console\Terminal;
 
 /**
  * Watches a release until it is over and prints each step as it changes, the
@@ -25,6 +28,16 @@ trait FollowsReleases
 
     private const array OVER = ['active', 'superseded', 'failed', 'cancelled'];
 
+    /** Housekeeping that has no line of its own unless it fails, named while it runs. */
+    private const array RUNNING_LABELS = [
+        'detach_assets' => 'Preparing the switch',
+    ];
+
+    private const array SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+    /** How often the live line is drawn between two looks at the release. */
+    private const int FRAMES_PER_POLL = 12;
+
     /**
      * @param  array<string, mixed>  $release
      * @return array<string, mixed> the release as it ended
@@ -32,7 +45,14 @@ trait FollowsReleases
     protected function follow(Api $api, array $release): array
     {
         $printed = [];
-        $started = microtime(true);
+        $started = Carbon::now();
+        // A terminal someone watches gets a live line; a log gets only finished steps.
+        $live = $this->input->isInteractive()
+            && $this->output->isDecorated()
+            && (stream_isatty(STDOUT) || $this->laravel->runningUnitTests());
+        $running = null;
+        $frame = 0;
+        $drawn = false;
 
         while (true) {
             foreach ($release['operation']['steps'] ?? [] as $step) {
@@ -51,11 +71,13 @@ trait FollowsReleases
                 }
 
                 $printed[$name] = $status;
-                // A rollback builds nothing: its image step only checks the registry.
-                $label = $name === 'image' && ($release['source'] ?? '') === 'rollback'
-                    ? 'Image still in your registry'
-                    : (self::STEP_LABELS[$name] ?? $name);
-                $elapsed = sprintf('%3ds', (int) (microtime(true) - $started));
+                $label = $this->stepLabel($name, $release);
+                $elapsed = sprintf('%3ds', (int) $started->diffInSeconds(Carbon::now(), true));
+
+                if ($drawn) {
+                    $this->clearLiveLine();
+                    $drawn = false;
+                }
 
                 $status === 'succeeded'
                     ? $this->line("  <fg=green>✓</> {$label} <fg=gray>{$elapsed}</>")
@@ -63,13 +85,116 @@ trait FollowsReleases
             }
 
             if (in_array($release['status'] ?? '', self::OVER, true)) {
+                if ($drawn) {
+                    $this->clearLiveLine();
+                }
+
                 return $release;
             }
 
-            Sleep::for(3)->seconds();
+            if (! $live) {
+                Sleep::for(3)->seconds();
+            } else {
+                $step = $this->runningStep($release);
+
+                // The clock of a step starts when it is first seen at work.
+                if ($step === null) {
+                    $running = null;
+                } elseif (($running['name'] ?? null) !== $step['name']) {
+                    $running = ['name' => (string) $step['name'], 'since' => Carbon::now()];
+                }
+
+                // Still three seconds between two looks, with the line drawn in between.
+                for ($tick = 0; $tick < self::FRAMES_PER_POLL; $tick++) {
+                    if ($step !== null && $running !== null) {
+                        $this->drawLiveLine($release, $step, $running['since'], $frame++);
+                        $drawn = true;
+                    }
+
+                    Sleep::for(intdiv(3000, self::FRAMES_PER_POLL))->milliseconds();
+                }
+            }
 
             $release = $api->get('/api/releases/'.$release['id'])['data'] ?? $release;
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $release
+     */
+    private function stepLabel(string $name, array $release): string
+    {
+        // A rollback builds nothing: its image step only checks the registry.
+        if ($name === 'image' && ($release['source'] ?? '') === 'rollback') {
+            return 'Image still in your registry';
+        }
+
+        return self::STEP_LABELS[$name] ?? self::RUNNING_LABELS[$name] ?? $name;
+    }
+
+    /**
+     * The step at work, or next in line: the first one that has not ended.
+     *
+     * @param  array<string, mixed>  $release
+     * @return array<string, mixed>|null
+     */
+    private function runningStep(array $release): ?array
+    {
+        foreach ($release['operation']['steps'] ?? [] as $step) {
+            if (in_array($step['status'] ?? '', ['pending', 'running'], true)) {
+                return $step;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Redraw the one line that says what is going on right now: the step, how
+     * long it has been at work, and what it waits for.
+     *
+     * @param  array<string, mixed>  $release
+     * @param  array<string, mixed>  $step
+     */
+    private function drawLiveLine(array $release, array $step, Carbon $since, int $frame): void
+    {
+        $spinner = self::SPINNER[$frame % count(self::SPINNER)];
+        $label = $this->stepLabel((string) $step['name'], $release);
+        $seconds = (int) $since->diffInSeconds(Carbon::now(), true);
+        $head = "  {$spinner} {$label} {$seconds}s";
+
+        $notes = [];
+        $retryAt = $release['operation']['retry_at'] ?? null;
+
+        if (is_string($retryAt) && $retryAt !== '' && ($release['operation']['status'] ?? '') === 'queued') {
+            $wait = max(0, (int) ceil(Carbon::now()->diffInSeconds(Carbon::parse($retryAt), false)));
+            $attempts = (int) ($step['attempts'] ?? 0);
+
+            // A step that failed a try counts it; one that waits for something does not.
+            $when = $wait > 0 ? 'in '.$wait.'s' : 'now';
+            $notes[] = $attempts > 0 ? 'try '.($attempts + 1).' '.$when : 'looking again '.$when;
+        }
+
+        // What the step waits for, as the server put it while it is not done yet.
+        $hint = $step['error_message'] ?? null;
+
+        if (is_string($hint) && $hint !== '') {
+            $notes[] = $hint;
+        }
+
+        // Never wider than the terminal: a wrapped line cannot be redrawn in place.
+        $room = (new Terminal)->getWidth() - 1 - mb_strwidth($head);
+        $tail = $notes === [] ? '' : mb_strimwidth(' · '.implode(' · ', $notes), 0, max(0, $room), '…');
+
+        $this->output->write(
+            "\r\e[2K  <fg=yellow>{$spinner}</> {$label} <fg=gray>{$seconds}s</>"
+            .($tail === '' ? '' : '<fg=gray>'.OutputFormatter::escape($tail).'</>'),
+        );
+    }
+
+    private function clearLiveLine(): void
+    {
+        $this->output->write("\r\e[2K");
     }
 
     /**
