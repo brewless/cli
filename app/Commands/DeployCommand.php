@@ -43,9 +43,17 @@ final class DeployCommand extends Command
             $link = $api->post('/api/environments/'.$environment['id'].'/releases/source', ['commit' => $commit])['data'] ?? [];
             $archive = $git->archive();
 
+            // Streamed from disk: a repository with media in it packs to hundreds of megabytes.
+            $source = fopen($archive, 'r');
+
+            if ($source === false) {
+                throw new RuntimeException('Could not read the packed commit. Nothing was deployed.');
+            }
+
             try {
-                $upload = Http::timeout(900)->withBody((string) file_get_contents($archive), 'application/gzip')->put((string) $link['url']);
+                $upload = Http::timeout(900)->withBody($source, 'application/gzip')->put((string) $link['url']);
             } finally {
+                fclose($source);
                 @unlink($archive);
             }
 
