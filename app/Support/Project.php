@@ -58,11 +58,28 @@ final class Project
         return new self($data['organisation'], $data['application'], is_string($data['framework'] ?? null) ? $data['framework'] : 'generic', $php);
     }
 
-    public function write(string $directory): void
+    /**
+     * Write the file. What it says besides which application this is, such
+     * as the environments that `brewless init --from-vapor` carried over,
+     * follows the four keys; each list or map after an empty line.
+     *
+     * @param  array<string, mixed>  $settings
+     */
+    public function write(string $directory, array $settings = []): void
     {
-        $yaml = "# Which application this is at Brewless. No secrets belong in this file.\n"
-            .Yaml::dump(array_filter(['organisation' => $this->organisation, 'application' => $this->application, 'framework' => $this->framework, 'php' => $this->php], static fn (?string $value): bool => $value !== null));
+        $top = array_filter(['organisation' => $this->organisation, 'application' => $this->application, 'framework' => $this->framework, 'php' => $this->php], static fn (?string $value): bool => $value !== null);
+        $parts = [];
 
-        file_put_contents($directory.'/'.self::FILE, $yaml);
+        foreach ($settings as $key => $value) {
+            if (is_array($value)) {
+                $parts[] = Yaml::dump([$key => $value], 10, 2);
+            } else {
+                $top[$key] = $value;
+            }
+        }
+
+        array_unshift($parts, Yaml::dump($top));
+
+        file_put_contents($directory.'/'.self::FILE, "# Which application this is at Brewless. No secrets belong in this file.\n".implode("\n", $parts));
     }
 }

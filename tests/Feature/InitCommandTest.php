@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Support\Project;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Symfony\Component\Yaml\Yaml;
 
 test('init connects the project to an application that exists', function (): void {
     signedIn('acme');
@@ -145,7 +147,11 @@ test('a vapor.yml can be the starting point: its environments, its PHP version a
         ->expectsQuestion('In which region?', 'fr-par')
         ->expectsConfirmation('Make this now?', 'yes')
         ->expectsOutputToContain('brewless domain:add production privasearch.example')
+        ->expectsOutputToContain('`brewless env:pull <environment>`, add yours from Vapor, then `brewless env:push <environment>`')
+        ->expectsOutputToContain('brewless.yml names the databases and buckets as vapor.yml does')
         ->assertSuccessful();
+
+    expect(Yaml::parseFile($this->project.'/brewless.yml')['environments']['production'])->toMatchArray(['region' => 'fr-par', 'database' => 'privasearch-db', 'storage' => 'privasearch-files', 'domains' => ['privasearch.example']]);
 
     expect(Project::read($this->project)->php)->toBe('8.3');
 
@@ -202,4 +208,218 @@ test('a plan the server refuses for the region is said in its words, with how to
         ->expectsOutputToContain('When that is settled: brewless provision production')
         ->expectsOutputToContain('Next: brewless provision production')
         ->assertSuccessful();
+});
+
+/**
+ * A vapor.yml as a Laravel application on Vapor has it: production as it
+ * runs, and a staging environment that uses most of what Vapor offers.
+ */
+function realisticVaporFile(): string
+{
+    return <<<'YAML'
+        id: 76217
+        name: privasearch
+        ignore:
+            - services
+            - docs
+        environments:
+            production:
+                memory: 1024
+                cli-memory: 512
+                gateway-version: 2
+                runtime: 'php-8.4:al2023'
+                database: regify
+                storage: privasearch
+                queue-timeout: 540
+                domain:
+                    - privasearch.eu
+                    - '*.privasearch.eu'
+                build:
+                    - 'composer install --no-dev'
+                    - 'npm ci && npm run build && rm -rf node_modules'
+                deploy:
+                    - 'php artisan migrate --force'
+                    - 'php artisan tenants:migrate'
+            staging:
+                runtime: 'php-8.4:al2-arm'
+                memory: 512
+                timeout: 5
+                warm: 10
+                concurrency: 120
+                tmp-storage: 4096
+                cli-timeout: 600
+                queues:
+                    - default
+                    - emails: 3
+                queue-memory: 1024
+                queue-concurrency: 5
+                scheduler: sub-minute
+                cache: privasearch-cache
+                octane: true
+                domain: staging.privasearch.eu
+                build:
+                    - 'composer install'
+                    - 'npm ci && npm run build'
+                    - 'php artisan event:cache'
+                deploy:
+                    - 'php artisan migrate --force'
+                    - 'echo done'
+        YAML;
+}
+
+test('init --from-vapor writes every setting of vapor.yml that brewless.yml has, and says once what it could not carry over', function (): void {
+    signedIn('acme');
+    file_put_contents($this->project.'/composer.json', json_encode(['require' => ['laravel/framework' => '^13.0']]));
+    file_put_contents($this->project.'/package-lock.json', '{}');
+    file_put_contents($this->project.'/vapor.yml', realisticVaporFile());
+    Http::fake(['*/cli/api/applications' => Http::response(applications())]);
+
+    $exitCode = $this->withoutMockingConsoleOutput()->artisan('init', ['--application' => 'shop', '--from-vapor' => true, '--environments' => 'none', '--no-interaction' => true]);
+    $output = Artisan::output();
+
+    expect($exitCode)->toBe(0)
+        ->and(file_get_contents($this->project.'/brewless.yml'))->toBe(<<<'YAML'
+            # Which application this is at Brewless. No secrets belong in this file.
+            organisation: acme
+            application: shop
+            framework: laravel
+            php: '8.4'
+
+            release:
+              - 'migrate --force'
+              - 'tenants:migrate'
+
+            environments:
+              production:
+                kind: production
+                web:
+                  memory: 1024
+                release:
+                  memory: 512
+                worker:
+                  timeout: 540
+                database: regify
+                queue: sqs
+                storage: privasearch
+                domains:
+                  - privasearch.eu
+                  - '*.privasearch.eu'
+              staging:
+                kind: staging
+                web:
+                  memory: 512
+                  timeout: 10
+                  min: 1
+                  max: 3
+                  tmp-storage: 2048
+                release:
+                  timeout: 600
+                worker:
+                  memory: 1024
+                  queues:
+                    - default
+                    - emails
+                scheduler: true
+                queue: sqs
+                domains:
+                  - staging.privasearch.eu
+
+            YAML);
+
+    // Each once, in plain words, in the terminal only.
+    expect($output)
+        ->toContain('Not carried over from vapor.yml as it was:')
+        ->toContain('- `gateway-version` (production): There is no API Gateway at Brewless')
+        ->toContain('- `build`: Left out, as Brewless does it itself: composer install --no-dev, npm ci, npm run build, rm -rf node_modules, composer install.')
+        ->toContain('- `build`, `deploy` (staging): brewless.yml has one list for all environments, so production\'s is used.')
+        ->toContain('- `deploy` (staging): A release command is a command of the framework\'s console, so this one is left out: echo done.')
+        ->toContain('- `warm` (staging): Vapor kept 10 Lambda containers warm')
+        ->toContain('- `concurrency` (staging): Vapor ran up to 120 requests at once')
+        ->toContain('- `timeout` (staging): `web.timeout` is from 10 to 3600, so it is 10 instead of 5.')
+        ->toContain('- `tmp-storage` (staging): Local disk is at most four times the memory')
+        ->toContain('- `queue-concurrency` (staging)')
+        ->toContain('- `scheduler` (staging)')
+        ->toContain('- `cache` (staging): Brewless sets up no cache.')
+        ->toContain('- `octane` (staging)')
+        ->toContain('- `runtime` (staging): Brewless chooses the processor of the containers itself')
+        ->toContain('- `ignore`: Brewless deploys what is committed')
+        ->and(substr_count($output, 'There is no API Gateway'))->toBe(1)
+        ->and(file_get_contents($this->project.'/brewless.yml'))->not->toContain('#  ', 'gateway', 'octane', 'cache');
+});
+
+test('init --from-vapor keeps the default environment, says what it cannot build and leaves out what Brewless cannot name', function (): void {
+    signedIn('acme');
+    file_put_contents($this->project.'/composer.json', json_encode(['require' => ['laravel/framework' => '^13.0']]));
+    file_put_contents($this->project.'/vapor.yml', <<<'YAML'
+        id: 1
+        name: shop
+        default-environment: staging
+        separate-vendor: true
+        environments:
+            production:
+                runtime: docker
+                queues: false
+                build:
+                    - 'npm ci && npm run build'
+            staging:
+                runtime: 'php-8.2:al2'
+                storage: Shop_Files
+                domain: 'not a domain'
+            Preview_Environment:
+                memory: 1024
+        YAML);
+    Http::fake(['*/cli/api/applications' => Http::response(applications())]);
+
+    $exitCode = $this->withoutMockingConsoleOutput()->artisan('init', ['--application' => 'shop', '--from-vapor' => true, '--environments' => 'none', '--no-interaction' => true]);
+    $output = Artisan::output();
+
+    // Without a package-lock.json Brewless builds no frontend, so the step stays.
+    expect($exitCode)->toBe(0)
+        ->and(file_get_contents($this->project.'/brewless.yml'))->toBe(<<<'YAML'
+            # Which application this is at Brewless. No secrets belong in this file.
+            organisation: acme
+            application: shop
+            framework: laravel
+            default-environment: staging
+
+            build:
+              - 'npm ci && npm run build'
+
+            environments:
+              production:
+                kind: production
+                queue: false
+              staging:
+                kind: staging
+                queue: sqs
+
+            YAML)
+        ->and($output)
+        ->toContain('- `separate-vendor`: Brewless has no such setting.')
+        ->toContain('- `runtime` (production): Brewless builds the image itself, on its public base image')
+        ->toContain('- `runtime` (staging): Brewless builds for PHP 8.3 and later, not for 8.2.')
+        ->toContain('- `storage` (staging): A bucket name at Brewless is 3 to 63 lowercase letters')
+        ->toContain('- `domain` (staging): Not a domain name Brewless takes: not a domain.')
+        ->toContain('- `Preview_Environment`: An environment name at Brewless is 2 to 30 lowercase letters')
+        ->not->toContain('one list for all environments');
+});
+
+test('the environments init adds from a vapor.yml get their region in brewless.yml', function (): void {
+    signedIn('acme');
+    freshOrganisation();
+    file_put_contents($this->project.'/vapor.yml', "id: 1\nenvironments:\n    production:\n        runtime: 'php-8.4:al2023'\n        memory: 2048\n    staging:\n        queues: false\n");
+
+    $this->artisan('init', ['--from-vapor' => true])
+        ->expectsQuestion('Which application is this?', '+ a new application')
+        ->expectsQuestion('What is the application called?', 'privasearch')
+        ->expectsQuestion('Which environments should it have?', ['production'])
+        ->expectsQuestion('In which region?', 'nl-ams')
+        ->expectsConfirmation('Make this now?', 'no')
+        ->assertSuccessful();
+
+    // Staging was not added, so it has no region yet; it stays in the file as vapor.yml has it.
+    expect(Yaml::parseFile($this->project.'/brewless.yml')['environments'])->toBe([
+        'production' => ['kind' => 'production', 'region' => 'nl-ams', 'web' => ['memory' => 2048], 'queue' => 'sqs'],
+        'staging' => ['kind' => 'staging', 'queue' => false],
+    ]);
 });
