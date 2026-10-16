@@ -4,8 +4,9 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.8.0 (2026-10-16)
 
+- `init --from-vapor` writes a full `brewless.yml` from `vapor.yml` and says once what it cannot carry over. Variables from Vapor are added to what Brewless wrote, and new resources carry names of their own.
 - `deploy` sends the whole `brewless.yml` along. Brewless applies sizes, scale, timeouts, `worker.queues`, `scheduler`, `build` and `release` steps and plain `variables` with the release (this needs Brewless with brewless.yml phase 2, and `brewless/laravel` 0.3 for `release`).
 - Before the release, `deploy` does what the file asks of the environment's resources: it makes an environment the file names that does not exist yet and sets it up, adds a database, queue or bucket it is missing, links a database Brewless manages already with a login of the environment's own, and adds its domains. It prints each step and what it let go after `false`. Domains the environment does not answer on yet are named and only added after a yes, or with `deploy --domains`: adding one can point its DNS at Brewless. A Brewless that does not do this yet is told apart, and the release is deployed as before.
 - What Brewless refuses in the file at a deploy is printed with its line, and nothing is deployed.
