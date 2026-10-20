@@ -57,6 +57,7 @@ brewless provision production # sets one environment up later, or again after so
 brewless deploy production   # build the current commit and put it live
 brewless releases production # what was deployed
 brewless rollback production # put the previous release back
+brewless service:push production gliner # build a service of brewless.yml with Docker and put it live
 brewless export production   # everything Brewless knows, as a folder with Terraform
 brewless detach production   # Brewless stops managing it; it keeps running
 ```
@@ -152,6 +153,29 @@ The client prints each step as it finishes and ends with the address of the
 environment. In a terminal, the step that is still running gets a live line
 with its seconds and what it waits for; in a log (no terminal, or with
 `--no-interaction`) only the finished steps are printed.
+
+## Services
+
+A service is a program next to your application that is not PHP, such as a
+model, in a container of its own. Name it in `brewless.yml` with the directory
+of its Dockerfile:
+
+```yaml
+environments:
+  production:
+    services:
+      gliner:
+        build: services/gliner
+        memory: 4096
+```
+
+`brewless service:push production gliner` builds that Dockerfile with Docker
+on this machine (for `linux/amd64`), uploads the image straight into a private
+bucket of your own Scaleway project, and Brewless puts it in your project's
+registry and runs it. The image is never public and does not pass through
+Brewless. The container gets a secret in `SERVICE_TOKEN`; the next deploy gives
+your application `GLINER_URL` and the same secret in `GLINER_TOKEN`. This needs
+Docker, and Brewless with services (BL-139).
 
 ## Signing in
 
