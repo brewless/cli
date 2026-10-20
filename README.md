@@ -157,6 +157,23 @@ this machine a token of its own, kept in `~/.config/brewless/credentials.json`
 (readable by you only). The token acts as you, works for 90 days and can be
 ended from the Account page of the console at any time.
 
+### In a pipeline
+
+A pipeline does not sign in. Make a pipeline token under **Pipeline tokens**
+on the Account page of the console and give it to the pipeline as the secret
+`BREWLESS_API_TOKEN`. With that variable set, the client uses it instead of
+the sign-in of the machine; the organisation comes from `brewless.yml`. The
+token acts as the person who made it, with their rights, and works until it
+is revoked or that person leaves the organisation.
+
+```bash
+composer global require brewless/cli
+BREWLESS_API_TOKEN=bl_… brewless deploy production --no-interaction
+```
+
+With `--no-interaction` the client asks nothing, and it ends with a non-zero
+exit code when the deploy fails, so the pipeline fails with it.
+
 ## Settings
 
 | Variable | Meaning | Default |
@@ -164,6 +181,7 @@ ended from the Account page of the console at any time.
 | `BREWLESS_HOST` | The domain organisations live under | `brewless.eu` |
 | `BREWLESS_SCHEME` | `http` only for a local installation | `https` |
 | `BREWLESS_HOME` | Where sign-ins are kept | `~/.config/brewless` |
+| `BREWLESS_API_TOKEN` | A pipeline token, used instead of the sign-in of the machine | not set |
 | `BREWLESS_NO_UPDATE_CHECK` | `1` never looks for a newer client | not set |
 
 ## Development

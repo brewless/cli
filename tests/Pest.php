@@ -19,7 +19,7 @@ uses()->beforeEach(function (): void {
     $this->project = $this->home.'/project';
     mkdir($this->project, 0700, true);
 
-    config(['brewless.home' => $this->home, 'brewless.host' => 'brewless.eu', 'brewless.scheme' => 'https']);
+    config(['brewless.home' => $this->home, 'brewless.host' => 'brewless.eu', 'brewless.scheme' => 'https', 'brewless.token' => null]);
 
     $this->previousDirectory = getcwd();
     chdir($this->project);
