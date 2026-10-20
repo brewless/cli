@@ -89,6 +89,9 @@ application should have:
    nowhere;
 4. whether it gets a private bucket for its files.
 
+With several Scaleway projects connected, a new application is first asked
+which one it runs in (`--project=` names it by name or ID).
+
 It says back what that comes to and makes it, in your own accounts, after one
 yes. Say no and it prints the `brewless provision` line that does the same
 later.

@@ -33,6 +33,7 @@ final class InitCommand extends Command
     protected $signature = 'init
         {--organisation= : The organisation the application belongs to}
         {--application= : The slug of an application that exists already}
+        {--project= : For a new application, with several Scaleway projects connected: the name or ID of the one it runs in}
         {--framework= : laravel, symfony or generic; detected from composer.json when left out}
         {--php= : The PHP version to build for, such as 8.4; left out, Brewless builds for its default}
         {--environments= : The environments to add, such as production,staging; "none" adds none}
@@ -61,7 +62,8 @@ final class InitCommand extends Command
             $api = $this->api($organisation);
             $vapor = $this->vapor($directory);
 
-            $applications = $api->get('/api/applications')['data'] ?? [];
+            $listing = $api->get('/api/applications');
+            $applications = $listing['data'] ?? [];
             $slug = $this->option('application');
 
             if (! is_string($slug)) {
@@ -73,7 +75,8 @@ final class InitCommand extends Command
 
             if ($slug === self::NEW_APPLICATION) {
                 $name = text(label: 'What is the application called?', default: basename($directory), required: true);
-                $application = $api->post('/api/applications', ['name' => $name, 'framework' => $framework])['data'] ?? [];
+                $project = $this->project($listing['options']['projects'] ?? []);
+                $application = $api->post('/api/applications', ['name' => $name, 'framework' => $framework, ...($project === null ? [] : ['provider_connection_id' => $project])])['data'] ?? [];
                 $slug = (string) ($application['slug'] ?? '');
 
                 $this->components->info('Created the application '.$slug.'.');
@@ -318,6 +321,42 @@ final class InitCommand extends Command
         }
 
         $this->newLine();
+    }
+
+    /**
+     * The Scaleway project a new application runs in, when the organisation
+     * connected several: the one named with --project, or the one chosen.
+     * With one or none the server knows, and nothing is asked.
+     *
+     * @param  array<array-key, mixed>  $projects
+     */
+    private function project(array $projects): ?string
+    {
+        $names = [];
+
+        foreach ($projects as $project) {
+            if (is_array($project) && is_string($project['id'] ?? null) && is_string($project['name'] ?? null)) {
+                $names[$project['id']] = $project['name'];
+            }
+        }
+
+        if (count($names) < 2) {
+            return null;
+        }
+
+        $given = $this->option('project');
+
+        if (is_string($given) && $given !== '') {
+            foreach ($names as $id => $name) {
+                if ($given === $id || strcasecmp($given, $name) === 0) {
+                    return $id;
+                }
+            }
+
+            throw new RuntimeException('There is no Scaleway project "'.$given.'". Connected: '.implode(', ', $names).'.');
+        }
+
+        return (string) select(label: 'Which Scaleway project does it run in?', options: $names);
     }
 
     private function framework(string $directory): string
