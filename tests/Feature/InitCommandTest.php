@@ -423,3 +423,58 @@ test('the environments init adds from a vapor.yml get their region in brewless.y
         'staging' => ['kind' => 'staging', 'queue' => false],
     ]);
 });
+
+/**
+ * An organisation with two Scaleway projects connected and no applications yet.
+ */
+function twoProjects(): void
+{
+    Http::fake([
+        '*/cli/api/applications' => fn (Request $request) => $request->method() === 'POST'
+            ? Http::response(['data' => ['id' => 'app9', 'slug' => 'privasearch', 'environments' => []]], 201)
+            : Http::response(['data' => [], 'options' => ['projects' => [['id' => 'p1', 'name' => 'Acme production'], ['id' => 'p2', 'name' => 'Client staging']]]]),
+    ]);
+}
+
+test('with several scaleway projects a new application is asked which one it runs in', function (): void {
+    signedIn('acme');
+    twoProjects();
+
+    $this->artisan('init', ['--environments' => 'none'])
+        ->expectsQuestion('Which application is this?', '+ a new application')
+        ->expectsQuestion('What is the application called?', 'privasearch')
+        ->expectsQuestion('Which Scaleway project does it run in?', 'p2')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && ($request['provider_connection_id'] ?? null) === 'p2');
+});
+
+test('--project names it by name or id, and an unknown one is refused with the ones there are', function (): void {
+    signedIn('acme');
+    twoProjects();
+
+    $this->artisan('init', ['--environments' => 'none', '--project' => 'client staging'])
+        ->expectsQuestion('Which application is this?', '+ a new application')
+        ->expectsQuestion('What is the application called?', 'privasearch')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && ($request['provider_connection_id'] ?? null) === 'p2');
+
+    $this->artisan('init', ['--environments' => 'none', '--project' => 'nope', '--force' => true])
+        ->expectsQuestion('Which application is this?', '+ a new application')
+        ->expectsQuestion('What is the application called?', 'privasearch')
+        ->expectsOutputToContain('There is no Scaleway project "nope". Connected: Acme production, Client staging.')
+        ->assertFailed();
+});
+
+test('with one project nothing is asked and none is sent', function (): void {
+    signedIn('acme');
+    freshOrganisation();
+
+    $this->artisan('init', ['--environments' => 'none'])
+        ->expectsQuestion('Which application is this?', '+ a new application')
+        ->expectsQuestion('What is the application called?', 'privasearch')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && ! array_key_exists('provider_connection_id', $request->data()));
+});

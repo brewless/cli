@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `init` asks which Scaleway project a new application runs in when the organisation connected several, and `--project=` names it by name or ID (this needs Brewless with several Scaleway projects, BL-137). With one project nothing changes.
+
 ## 0.9.0 (2026-10-20)
 
 - A pipeline deploys without `brewless login`: with `BREWLESS_API_TOKEN` set to a pipeline token from the Account page of the console, every command uses that token instead of the sign-in of the machine. When Brewless refuses it, the client says the token was refused instead of asking to sign in.
