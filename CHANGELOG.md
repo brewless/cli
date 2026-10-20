@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.10.0 (2026-10-20)
 
 - `init` asks which Scaleway project a new application runs in when the organisation connected several, and `--project=` names it by name or ID (this needs Brewless with several Scaleway projects, BL-137). With one project nothing changes.
 
