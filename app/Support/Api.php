@@ -15,7 +15,12 @@ use Illuminate\Support\Facades\Http;
  */
 final class Api
 {
-    public function __construct(private readonly string $organisation, private readonly ?string $token = null) {}
+    public function __construct(
+        private readonly string $organisation,
+        private readonly ?string $token = null,
+        /** The token came from BREWLESS_API_TOKEN rather than from `brewless login`. */
+        private readonly bool $fromEnvironment = false,
+    ) {}
 
     public function baseUrl(): string
     {
@@ -87,7 +92,9 @@ final class Api
     private function explain(Response $response): string
     {
         return match ($response->status()) {
-            401 => 'You are not signed in to '.$this->organisation.', or the sign-in has ended. Run: brewless login '.$this->organisation,
+            401 => $this->fromEnvironment
+                ? 'Brewless refused the token in BREWLESS_API_TOKEN for '.$this->organisation.'. It was revoked, the person who made it left the organisation, or it belongs to another organisation. Make a new one under Pipeline tokens on the Account page of the console.'
+                : 'You are not signed in to '.$this->organisation.', or the sign-in has ended. Run: brewless login '.$this->organisation,
             403 => 'You may not do this in '.$this->organisation.'. Deploying takes the owner or admin role.',
             404 => 'Brewless does not know that here. Check the organisation, the application and the environment.',
             423 => 'This organisation is blocked.',

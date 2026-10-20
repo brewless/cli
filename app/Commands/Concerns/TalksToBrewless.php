@@ -22,10 +22,17 @@ trait TalksToBrewless
     }
 
     /**
-     * The api of an organisation, signed in as whoever ran `brewless login` for it.
+     * The api of an organisation, signed in with the pipeline token in
+     * BREWLESS_API_TOKEN, or else as whoever ran `brewless login` for it.
      */
     protected function api(string $organisation): Api
     {
+        $token = config('brewless.token');
+
+        if (is_string($token) && trim($token) !== '') {
+            return new Api($organisation, trim($token), fromEnvironment: true);
+        }
+
         $credentials = resolve(Credentials::class)->for((string) config('brewless.host'), $organisation);
 
         if ($credentials === null) {

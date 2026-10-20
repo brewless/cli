@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.9.0 (2026-10-20)
+
+- A pipeline deploys without `brewless login`: with `BREWLESS_API_TOKEN` set to a pipeline token from the Account page of the console, every command uses that token instead of the sign-in of the machine. When Brewless refuses it, the client says the token was refused instead of asking to sign in.
+
 ## 0.8.0 (2026-10-16)
 
 - `init --from-vapor` writes a full `brewless.yml` from `vapor.yml` and says once what it cannot carry over. Variables from Vapor are added to what Brewless wrote, and new resources carry names of their own.
