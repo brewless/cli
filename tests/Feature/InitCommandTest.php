@@ -339,7 +339,7 @@ test('init --from-vapor writes every setting of vapor.yml that brewless.yml has,
         ->toContain('- `tmp-storage` (staging): Local disk is at most four times the memory')
         ->toContain('- `queue-concurrency` (staging)')
         ->toContain('- `scheduler` (staging)')
-        ->toContain('- `cache` (staging): Brewless sets up no cache.')
+        ->toContain('- `cache` (staging): Not carried over: add `cache: <name>`')
         ->toContain('- `octane` (staging)')
         ->toContain('- `runtime` (staging): Brewless chooses the processor of the containers itself')
         ->toContain('- `ignore`: Brewless deploys what is committed')

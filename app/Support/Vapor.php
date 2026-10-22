@@ -69,8 +69,8 @@ final class Vapor
 
     /** Keys of an environment Brewless has no setting for, with what to do instead. */
     private const array NOT_CARRIED = [
-        'cache' => 'Brewless sets up no cache. Use a cache store of the framework, such as the database, or a Redis of your own with its variables pushed by `brewless env:push`.',
-        'network' => 'Brewless has no network to name.',
+        'cache' => 'Not carried over: add `cache: <name>` under the environment in brewless.yml for a Scaleway Managed Database for Redis, reached over the Private Network.',
+        'network' => 'Not carried over: add `network: private` under the environment in brewless.yml to put its containers on the Private Network of your Scaleway project.',
         'balancer' => 'Brewless has no load balancer to name: visitors reach the web container through bunny.net, or its own address without it.',
         'firewall' => 'Brewless has no firewall setting.',
         'gateway-version' => 'There is no API Gateway at Brewless: visitors reach the web container through bunny.net, or its own address without it.',
