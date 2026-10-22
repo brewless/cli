@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.12.0 (2026-10-23)
 
 - `deploy` and `init` name the steps for the Private Network and the cache of an environment (`network: private` and `cache` in `brewless.yml`), and the bucket for backups and the key for databases per tenant, instead of their internal names; a step the file does not ask for stays out of sight.
 - `init --from-vapor` says how to add a cache and a Private Network to `brewless.yml` instead of that Brewless has none.
