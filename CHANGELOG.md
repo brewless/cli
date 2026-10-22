@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `deploy` and `init` name the steps for the Private Network and the cache of an environment (`network: private` and `cache` in `brewless.yml`), and the bucket for backups and the key for databases per tenant, instead of their internal names; a step the file does not ask for stays out of sight.
+
 ## 0.11.0 (2026-10-20)
 
 - `service:push <environment> <service>` builds a service of `brewless.yml` (`environments.<name>.services`) with Docker on this machine, uploads the image straight into a private bucket of your Scaleway project and puts it live; it prints each step and fails with the reason when Brewless could not. This needs Docker, and Brewless with services (BL-139).

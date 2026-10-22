@@ -494,3 +494,33 @@ test('a Brewless that does not set environments up from the file yet still deplo
         ->expectsOutputToContain('Release 2 is live.')
         ->assertSuccessful();
 });
+
+test('a cache in the file shows its network and cache steps; without one they stay out of sight', function (string $file, bool $shown): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', $file);
+    $names = ['registry', 'namespace', 'database', 'network', 'cache', 'queue', 'bucket', 'containers', 'edge', 'variables', 'record'];
+    $operation = ['id' => 'op1', 'status' => 'succeeded', 'steps' => array_map(static fn (string $name): array => ['name' => $name, 'status' => 'succeeded'], $names)];
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::sequence()
+            ->push(['data' => applied(['running' => true, 'operation' => $operation])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
+        'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
+    ]);
+
+    $command = $this->artisan('deploy', ['environment' => 'production']);
+
+    $shown
+        ? $command->expectsOutputToContain('Private Network of the project')->expectsOutputToContain('Cache (Managed Database for Redis)')
+        : $command->doesntExpectOutputToContain('Private Network of the project')->doesntExpectOutputToContain('Cache (Managed Database for Redis)');
+
+    $command->assertSuccessful();
+})->with([
+    'a cache' => ["organisation: acme\napplication: shop\nenvironments:\n  production:\n    cache: shop-cache\n", true],
+    'no cache' => ["organisation: acme\napplication: shop\nenvironments:\n  production:\n    storage: shop-files\n", false],
+]);

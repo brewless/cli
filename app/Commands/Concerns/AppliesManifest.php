@@ -63,6 +63,11 @@ trait AppliesManifest
                 'database' => ! is_string($settings['database'] ?? null),
                 'queue' => ($settings['queue'] ?? null) !== 'sqs',
                 'bucket' => ! is_string($settings['storage'] ?? null),
+                'backup_bucket' => ! is_array($settings['backup'] ?? null),
+                'runtime_databases' => ! is_array($settings['databases'] ?? null),
+                // A cache is reached over the network only, so it brings the network along.
+                'network' => ($settings['network'] ?? null) !== 'private' && ! isset($settings['cache']),
+                'cache' => ! isset($settings['cache']) || $settings['cache'] === false,
             ]));
             $operation = $this->followSetup($api, $applied['operation'], $silent);
 
