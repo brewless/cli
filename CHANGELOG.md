@@ -4,6 +4,13 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.13.0 (2026-10-24)
+
+- `init --name=<name>` creates a new application without a question. Without a terminal, `init` now says that `--application=` or `--name=` is missing, instead of only "Required.".
+- `env:pull` says so when git would not ignore the file it wrote: Laravel's own `.gitignore` names `.env.production` but not `.env.staging`. In a terminal it offers to add the file to `.gitignore`.
+- `deploy` names every step in words, also the check of the edge settings and the test address, which showed their internal names.
+- `detach` says that the test address on Brewless's own domain stops working, next to what stays.
+
 ## 0.12.0 (2026-10-23)
 
 - `deploy` and `init` name the steps for the Private Network and the cache of an environment (`network: private` and `cache` in `brewless.yml`), and the bucket for backups and the key for databases per tenant, instead of their internal names; a step the file does not ask for stays out of sight.
