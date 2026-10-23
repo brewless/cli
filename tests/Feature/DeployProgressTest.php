@@ -182,3 +182,18 @@ test('without a terminal to redraw, or with --no-interaction, only finished step
     'no colours' => [[]],
     'no interaction' => [['--ansi' => true, '--no-interaction' => true]],
 ]);
+
+test('every step a deploy runs has a line in words, not its name', function (): void {
+    $steps = ['image', 'migrate', 'activate', 'workers', 'edge', 'attach_assets', 'preview'];
+    $done = array_map(static fn (string $name): array => ['name' => $name, 'status' => 'succeeded', 'attempts' => 1, 'error_message' => null], $steps);
+
+    $screen = screen(rollbackPrinting([
+        rollbackRelease(['status' => 'active', 'operation' => ['status' => 'succeeded', 'steps' => $done]]),
+    ]));
+
+    expect($screen)
+        ->toContain('  ✓ Edge settings checked')
+        ->toContain('  ✓ Built files served from your storage zone')
+        ->toContain('  ✓ Test address')
+        ->not->toMatch('/✓ (edge|preview)\b/');
+});

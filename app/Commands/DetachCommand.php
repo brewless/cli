@@ -29,7 +29,8 @@ final class DetachCommand extends Command
 
             $this->line('Detaching '.$name.' ends what Brewless does for it:');
             $this->line('  stops    deploying, rolling back, scaling, checking for changes made elsewhere');
-            $this->line('  stays    your containers, database, domains, certificates, the trigger of the worker, your secrets');
+            $this->line('  stays    your containers, database, your own domains, certificates, the trigger of the worker, your secrets');
+            $this->line('  goes     the test address on Brewless\'s domain (such as brewless.dev): its record is in Brewless\'s zone');
             $this->line('Nothing at your providers is touched. A last export is written first.');
 
             if (! $this->option('force') && ! $this->confirm('Detach '.$name.'?', false)) {

@@ -56,8 +56,34 @@ final class EnvPullCommand extends Command
 
             $this->components->info('Wrote revision '.$latest['revision'].' ('.count(EnvFile::names($latest['content'])).' variables) to '.basename($path).'.');
             $this->line('  It holds secrets: keep it out of git.');
+            $this->keepOutOfGit($path);
 
             return self::SUCCESS;
         });
+    }
+
+    /**
+     * Laravel's own .gitignore names .env.production but no other
+     * environment: a file this command wrote for staging would show up as
+     * something to commit. Say so, and in a terminal offer to add it.
+     */
+    private function keepOutOfGit(string $path): void
+    {
+        $directory = dirname($path);
+        exec('git -C '.escapeshellarg($directory).' check-ignore -q '.escapeshellarg(basename($path)).' 2>/dev/null', $output, $status);
+
+        // 0: ignored. 128: not a git repository. Only 1 means git would offer to commit it.
+        if ($status !== 1) {
+            return;
+        }
+
+        $this->components->warn(basename($path).' is not in .gitignore, so git would offer to commit it.');
+
+        if ($this->input->isInteractive() && $this->confirm('Add '.basename($path).' to .gitignore?', true)) {
+            $gitignore = $directory.'/.gitignore';
+            $current = is_file($gitignore) ? (string) file_get_contents($gitignore) : '';
+            file_put_contents($gitignore, ($current === '' || str_ends_with($current, "\n") ? '' : "\n").basename($path)."\n", FILE_APPEND);
+            $this->components->info('Added '.basename($path).' to .gitignore.');
+        }
     }
 }

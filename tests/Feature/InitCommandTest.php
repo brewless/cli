@@ -35,6 +35,24 @@ test('init refuses an application the organisation does not have and a framework
     expect(Project::exists($this->project))->toBeFalse();
 });
 
+test('a script creates a new application by name, and is told which option is missing when it names none', function (): void {
+    signedIn('acme');
+    freshOrganisation();
+
+    $this->artisan('init', ['--environments' => 'none', '--no-interaction' => true])
+        ->expectsOutputToContain('Say which application this is: --application=<slug> for one that exists, or --name=<name> to create a new one.')
+        ->assertFailed();
+
+    expect(Project::exists($this->project))->toBeFalse();
+
+    $this->artisan('init', ['--name' => 'PrivaSearch', '--environments' => 'none', '--no-interaction' => true])
+        ->expectsOutputToContain('Created the application privasearch.')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && str_ends_with($request->url(), '/cli/api/applications') && $request['name'] === 'PrivaSearch');
+    expect(Project::read($this->project)->application)->toBe('privasearch');
+});
+
 test('init needs a sign-in first', function (): void {
     $this->artisan('init', ['--application' => 'shop'])
         ->expectsOutputToContain('not signed in to any organisation')

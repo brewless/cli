@@ -23,7 +23,9 @@ trait FollowsReleases
         'migrate' => 'Release commands',
         'activate' => 'Web container live and healthy',
         'workers' => 'Workers and schedule',
+        'edge' => 'Edge settings checked',
         'attach_assets' => 'Built files served from your storage zone',
+        'preview' => 'Test address',
     ];
 
     private const array OVER = ['active', 'superseded', 'failed', 'cancelled'];

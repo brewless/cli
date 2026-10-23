@@ -33,6 +33,7 @@ final class InitCommand extends Command
     protected $signature = 'init
         {--organisation= : The organisation the application belongs to}
         {--application= : The slug of an application that exists already}
+        {--name= : The name of a new application to create}
         {--project= : For a new application, with several Scaleway projects connected: the name or ID of the one it runs in}
         {--framework= : laravel, symfony or generic; detected from composer.json when left out}
         {--php= : The PHP version to build for, such as 8.4; left out, Brewless builds for its default}
@@ -65,6 +66,16 @@ final class InitCommand extends Command
             $listing = $api->get('/api/applications');
             $applications = $listing['data'] ?? [];
             $slug = $this->option('application');
+            $newName = $this->option('name');
+
+            if (! is_string($slug) && is_string($newName) && $newName !== '') {
+                $slug = self::NEW_APPLICATION;
+            }
+
+            // Without a terminal nobody can pick from the list: say which option answers it.
+            if (! is_string($slug) && ! $this->input->isInteractive()) {
+                throw new RuntimeException('Say which application this is: --application=<slug> for one that exists, or --name=<name> to create a new one.');
+            }
 
             if (! is_string($slug)) {
                 $slug = select(
@@ -74,7 +85,9 @@ final class InitCommand extends Command
             }
 
             if ($slug === self::NEW_APPLICATION) {
-                $name = text(label: 'What is the application called?', default: basename($directory), required: true);
+                $name = is_string($newName) && $newName !== ''
+                    ? $newName
+                    : text(label: 'What is the application called?', default: basename($directory), required: true);
                 $project = $this->project($listing['options']['projects'] ?? []);
                 $application = $api->post('/api/applications', ['name' => $name, 'framework' => $framework, ...($project === null ? [] : ['provider_connection_id' => $project])])['data'] ?? [];
                 $slug = (string) ($application['slug'] ?? '');
