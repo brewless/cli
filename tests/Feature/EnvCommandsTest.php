@@ -304,3 +304,34 @@ test('push --force through brewless says so, so brewless writes over a newer rev
 
     expect(pushedFile()?->data())->toMatchArray(['base_revision' => null, 'force' => true]);
 });
+
+test('a pulled file that git would offer to commit is said, and added to .gitignore after a yes', function (): void {
+    throughBrewless(['revision' => 7, 'content' => "APP_NAME=Shop\n"]);
+    exec('git -C '.escapeshellarg($this->project).' init -q');
+    file_put_contents($this->project.'/.gitignore', ".env\n.env.production-other\n");
+
+    $this->artisan('env:pull', ['environment' => 'production'])
+        ->expectsOutputToContain('.env.production is not in .gitignore, so git would offer to commit it.')
+        ->expectsConfirmation('Add .env.production to .gitignore?', 'yes')
+        ->assertSuccessful();
+
+    exec('git -C '.escapeshellarg($this->project).' check-ignore -q .env.production', $output, $status);
+
+    expect($status)->toBe(0)
+        ->and(file_get_contents($this->project.'/.gitignore'))->toBe(".env\n.env.production-other\n.env.production\n");
+});
+
+test('a pulled file git ignores already, or a project without git, gets no warning', function (): void {
+    throughBrewless(['revision' => 7, 'content' => "APP_NAME=Shop\n"]);
+
+    $this->artisan('env:pull', ['environment' => 'production'])
+        ->doesntExpectOutputToContain('is not in .gitignore')
+        ->assertSuccessful();
+
+    exec('git -C '.escapeshellarg($this->project).' init -q');
+    file_put_contents($this->project.'/.gitignore', ".env.*\n");
+
+    $this->artisan('env:pull', ['environment' => 'production'])
+        ->doesntExpectOutputToContain('is not in .gitignore')
+        ->assertSuccessful();
+});
