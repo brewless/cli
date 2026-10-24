@@ -252,6 +252,10 @@ function realisticVaporFile(): string
                 domain:
                     - privasearch.eu
                     - '*.privasearch.eu'
+                firewall:
+                    rate-limit: 1000
+                    bot-control:
+                        - CategorySocialMedia
                 build:
                     - 'composer install --no-dev'
                     - 'npm ci && npm run build && rm -rf node_modules'
@@ -322,6 +326,8 @@ test('init --from-vapor writes every setting of vapor.yml that brewless.yml has,
                 domains:
                   - privasearch.eu
                   - '*.privasearch.eu'
+                firewall:
+                  rate_limit: 34
               staging:
                 kind: staging
                 web:
@@ -361,6 +367,8 @@ test('init --from-vapor writes every setting of vapor.yml that brewless.yml has,
         ->toContain('- `octane` (staging)')
         ->toContain('- `runtime` (staging): Brewless chooses the processor of the containers itself')
         ->toContain('- `ignore`: Brewless deploys what is committed')
+        ->toContain('- `firewall.rate-limit` (production): Carried over as `firewall.rate_limit: 34`: Brewless counts requests per address in 10 seconds, Vapor in 5 minutes.')
+        ->toContain('- `firewall.bot-control` (production): Not carried over', 'a paid plan billed by bunny.net')
         ->and(substr_count($output, 'There is no API Gateway'))->toBe(1)
         ->and(file_get_contents($this->project.'/brewless.yml'))->not->toContain('#  ', 'gateway', 'octane', 'cache');
 });

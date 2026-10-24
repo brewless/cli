@@ -12,6 +12,7 @@ use App\Support\Manifest;
 use App\Support\Project;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 
 final class PlanCommand extends Command
 {
@@ -93,6 +94,11 @@ final class PlanCommand extends Command
             $note = ($line['applied_on_deploy'] ?? true) === false && ! in_array($state, ['same', 'kept'], true) ? ' <fg=gray>(not applied by a deploy yet)</>' : '';
 
             $this->line(sprintf('  %s %-24s %s', self::MARKS[$state] ?? '?', $line['key'], $what).$note);
+
+            // What Brewless wants known about a line, such as a cost at the provider, under it.
+            if (is_string($line['note'] ?? null) && $line['note'] !== '' && $state !== 'same') {
+                $this->line('      <fg=gray>'.OutputFormatter::escape($line['note']).'</>');
+            }
         }
 
         $this->newLine();

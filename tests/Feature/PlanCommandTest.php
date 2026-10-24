@@ -89,6 +89,24 @@ test('plan for one environment shows only that one', function (): void {
     $this->artisan('plan live')->expectsOutputToContain('brewless.yml has no environment "live".')->assertFailed();
 });
 
+test('a note brewless gives with a line, such as a cost at bunny.net, is shown under it', function (): void {
+    $answer = planAnswer();
+    $answer['data']['environments'][0]['lines'][] = ['key' => 'firewall.bot_control', 'current' => null, 'wanted' => 'challenge', 'state' => 'add', 'applied_on_deploy' => true, 'note' => 'Needs Shield Advanced or higher, billed by bunny.net.'];
+    $answer['data']['environments'][0]['lines'][] = ['key' => 'firewall.rate_limit', 'current' => '100', 'wanted' => '100', 'state' => 'same', 'applied_on_deploy' => true, 'note' => 'Requests per 10 seconds.'];
+
+    Http::fake([
+        '*/cli/api/applications/app1/manifest/plan' => Http::response($answer),
+        '*/cli/api/applications' => Http::response(applications()),
+    ]);
+
+    $this->artisan('plan')
+        ->expectsOutputToContain('+ firewall.bot_control     add challenge')
+        ->expectsOutputToContain('      Needs Shield Advanced or higher, billed by bunny.net.')
+        // A line that changes nothing does not repeat its note.
+        ->doesntExpectOutputToContain('Requests per 10 seconds.')
+        ->assertSuccessful();
+});
+
 test('what brewless refuses in the file is shown with the line it is on', function (): void {
     Http::fake([
         '*/cli/api/applications/app1/manifest/plan' => Http::response(['message' => 'invalid', 'errors' => [

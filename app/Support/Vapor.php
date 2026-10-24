@@ -64,15 +64,17 @@ final class Vapor
     private const array READ = [
         'runtime', 'memory', 'timeout', 'warm', 'concurrency', 'tmp-storage', 'cli-memory', 'cli-timeout',
         'queues', 'queue-memory', 'queue-timeout', 'queue-concurrency', 'scheduler', 'build', 'deploy',
-        'domain', 'database', 'storage', 'docker-build-args', 'docker-build-options', 'dockerfile',
+        'domain', 'database', 'storage', 'docker-build-args', 'docker-build-options', 'dockerfile', 'firewall',
     ];
+
+    /** Vapor counts a rate limit per address over five minutes; Brewless over ten seconds, Shield Basic's longest window. */
+    private const int VAPOR_RATE_WINDOWS = 30;
 
     /** Keys of an environment Brewless has no setting for, with what to do instead. */
     private const array NOT_CARRIED = [
         'cache' => 'Not carried over: add `cache: <name>` under the environment in brewless.yml for a Scaleway Managed Database for Redis, reached over the Private Network.',
         'network' => 'Not carried over: add `network: private` under the environment in brewless.yml to put its containers on the Private Network of your Scaleway project.',
         'balancer' => 'Brewless has no load balancer to name: visitors reach the web container through bunny.net, or its own address without it.',
-        'firewall' => 'Brewless has no firewall setting.',
         'gateway-version' => 'There is no API Gateway at Brewless: visitors reach the web container through bunny.net, or its own address without it.',
         'octane' => 'Brewless serves the application with FrankenPHP in its classic mode, without Octane.',
         'octane-database-session-persist' => 'Brewless serves the application with FrankenPHP in its classic mode, without Octane.',
@@ -432,6 +434,18 @@ final class Vapor
 
         if ($domains !== []) {
             $environment['domains'] = array_values(array_unique($domains));
+        }
+
+        $firewall = is_array($settings['firewall'] ?? null) ? $settings['firewall'] : [];
+        $rateLimit = $firewall['rate-limit'] ?? null;
+
+        if (is_int($rateLimit) && $rateLimit > 0) {
+            $environment['firewall'] = ['rate_limit' => (int) ceil($rateLimit / self::VAPOR_RATE_WINDOWS)];
+            $warn('firewall.rate-limit', $name, 'Carried over as `firewall.rate_limit: '.$environment['firewall']['rate_limit'].'`: Brewless counts requests per address in 10 seconds, Vapor in 5 minutes. It needs bunny.net in front of the environment.');
+        }
+
+        if (isset($firewall['bot-control'])) {
+            $warn('firewall.bot-control', $name, 'Not carried over: Brewless has `firewall.bot_control: challenge`, without categories. It takes Shield Advanced or higher at bunny.net, a paid plan billed by bunny.net.');
         }
 
         foreach ($settings as $key => $value) {
