@@ -64,7 +64,7 @@ final class PlanCommand extends Command
                 $this->newLine();
             }
 
-            $this->line('  <fg=gray>A deploy applies these lines, except those marked "not applied by a deploy yet". Removing a key from '.Project::FILE.' never removes anything.</>');
+            $this->line('  <fg=gray>A deploy applies these lines, except those marked "not applied by a deploy yet" or "applied by brewless service:push". Removing a key from '.Project::FILE.' never removes anything.</>');
 
             return self::SUCCESS;
         });
@@ -89,8 +89,12 @@ final class PlanCommand extends Command
                 default => ($line['wanted'] ?? '').' (what stands cannot be read)',
             };
 
-            // What a deploy does not carry out yet is shown, and said to be only shown.
-            $note = ($line['applied_on_deploy'] ?? true) === false && ! in_array($state, ['same', 'kept'], true) ? ' <fg=gray>(not applied by a deploy yet)</>' : '';
+            // What a deploy does not carry out is shown, with what does: another command, or nothing yet.
+            $note = match (true) {
+                in_array($state, ['same', 'kept'], true) || ($line['applied_on_deploy'] ?? true) !== false => '',
+                ($line['applied_by'] ?? null) === 'service:push' => ' <fg=gray>(applied by brewless service:push)</>',
+                default => ' <fg=gray>(not applied by a deploy yet)</>',
+            };
 
             $this->line(sprintf('  %s %-24s %s', self::MARKS[$state] ?? '?', $line['key'], $what).$note);
         }

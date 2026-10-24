@@ -167,7 +167,25 @@ environments:
       gliner:
         build: services/gliner
         memory: 4096
+        min: 0
+        max: 5
+        concurrency: 2
 ```
+
+Besides `memory`, `cpu` and `timeout`, a service takes its scaling:
+
+| Key | Default | What it does |
+| --- | --- | --- |
+| `min` | `0` | The fewest replicas that keep running; `0` lets the service sleep when nobody calls it, `1` keeps one warm. |
+| `max` | `1` | The most replicas Scaleway starts (up to 50). |
+| `concurrency` | Scaleway's own, 50 | How many requests one replica takes at once before Scaleway starts another (1 to 80). Without it Brewless sends none and the container keeps what it has. |
+
+A service with two worker processes per replica takes `concurrency: 2`: with
+`max: 5`, ten requests then run side by side on five replicas instead of
+waiting on one. The settings take effect at the next `service:push`, also when
+the image did not change; a deploy of the application does not change them.
+`brewless plan` shows them next to what the container has, marked as applied
+by `brewless service:push`. `concurrency` needs Brewless with service scaling.
 
 `brewless service:push production gliner` builds that Dockerfile with Docker
 on this machine (for `linux/amd64`), uploads the image straight into a private

@@ -41,6 +41,9 @@ function planAnswer(): array
                 ['key' => 'database', 'current' => null, 'wanted' => 'shop-main', 'state' => 'add', 'applied_on_deploy' => false],
                 ['key' => 'domains', 'current' => null, 'wanted' => 'shop.example.eu', 'state' => 'unknown', 'applied_on_deploy' => false],
                 ['key' => 'variables.APP_LOCALE', 'current' => null, 'wanted' => 'nl', 'state' => 'refused', 'reason' => 'The variables of this environment are not kept through Brewless yet.', 'applied_on_deploy' => true],
+                ['key' => 'services.gliner.concurrency', 'current' => null, 'wanted' => '2', 'state' => 'unknown', 'applied_on_deploy' => false, 'applied_by' => 'service:push'],
+                ['key' => 'services.gliner.max', 'current' => '1', 'wanted' => '5', 'state' => 'change', 'applied_on_deploy' => false, 'applied_by' => 'service:push'],
+                ['key' => 'services.gliner.min', 'current' => '0', 'wanted' => '0', 'state' => 'same', 'applied_on_deploy' => false, 'applied_by' => 'service:push'],
             ]],
             ['name' => 'staging', 'exists' => false, 'lines' => [
                 ['key' => 'environment', 'current' => null, 'wanted' => 'staging', 'state' => 'add', 'applied_on_deploy' => false],
@@ -66,7 +69,12 @@ test('plan sends the whole file, php as text, and shows per environment what wou
         ->expectsOutputToContain('staging (not at Brewless yet)')
         ->expectsOutputToContain('+ environment              a new staging environment')
         ->expectsOutputToContain('Not in brewless.yml, so left as they are: preview.')
-        ->expectsOutputToContain('A deploy applies these lines, except those marked "not applied by a deploy yet".')
+        // The scaling of a service is put live by service:push, not by a deploy.
+        ->expectsOutputToContain('~ services.gliner.max      1 → 5 (applied by brewless service:push)')
+        ->expectsOutputToContain('? services.gliner.concurrency 2 (what stands cannot be read) (applied by brewless service:push)')
+        ->expectsOutputToContain('= services.gliner.min      0')
+        ->doesntExpectOutputToContain('= services.gliner.min      0 (applied')
+        ->expectsOutputToContain('A deploy applies these lines, except those marked "not applied by a deploy yet" or "applied by brewless service:push".')
         ->assertSuccessful();
 
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/manifest/plan')

@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `plan` marks the settings of a service (`services.<name>.*` in `brewless.yml`, such as `min`, `max` and the new `concurrency`) as applied by `brewless service:push` instead of "not applied by a deploy yet". The README names the scaling keys of a service. Both need Brewless with service scaling.
+
 ## 0.13.0 (2026-10-24)
 
 - `init --name=<name>` creates a new application without a question. Without a terminal, `init` now says that `--application=` or `--name=` is missing, instead of only "Required.".
