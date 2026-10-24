@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.13.1 (2026-10-24)
+
+- `deploy` and `rollback` keep following the release when Brewless briefly answers with a server error or cannot be reached, as can happen while a new version goes live. After two minutes without an answer they stop and say that the release goes on at Brewless. A refusal, such as a revoked token, still stops them at once.
+
 ## 0.13.0 (2026-10-24)
 
 - `init --name=<name>` creates a new application without a question. Without a terminal, `init` now says that `--application=` or `--name=` is missing, instead of only "Required.".
