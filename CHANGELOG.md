@@ -4,6 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.14.0 (2026-10-24)
+
+- `plan` shows a note under a line when Brewless gives one, such as that bot control under `firewall` takes a paid Shield plan at bunny.net.
+- `init --from-vapor` carries `firewall.rate-limit` over as `firewall.rate_limit`: Vapor counts per address in 5 minutes, Brewless in 10 seconds, so the number is divided by 30. `bot-control` is named as not carried over.
+
 ## 0.13.1 (2026-10-24)
 
 - `deploy` and `rollback` keep following the release when Brewless briefly answers with a server error or cannot be reached, as can happen while a new version goes live. After two minutes without an answer they stop and say that the release goes on at Brewless. A refusal, such as a revoked token, still stops them at once.
