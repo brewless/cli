@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Commands\Concerns;
 
 use App\Support\Api;
+use App\Support\ApiException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Sleep;
 use Symfony\Component\Console\Formatter\OutputFormatter;
@@ -41,6 +42,13 @@ trait FollowsReleases
     private const int FRAMES_PER_POLL = 12;
 
     /**
+     * How long Brewless may fail to answer before following stops. During a
+     * rollout the old version can briefly answer with an error, and the
+     * release goes on regardless.
+     */
+    private const int UNANSWERED_SECONDS = 120;
+
+    /**
      * @param  array<string, mixed>  $release
      * @return array<string, mixed> the release as it ended
      */
@@ -55,6 +63,7 @@ trait FollowsReleases
         $running = null;
         $frame = 0;
         $drawn = false;
+        $unansweredSince = null;
 
         while (true) {
             foreach ($release['operation']['steps'] ?? [] as $step) {
@@ -117,8 +126,41 @@ trait FollowsReleases
                 }
             }
 
-            $release = $api->get('/api/releases/'.$release['id'])['data'] ?? $release;
+            try {
+                $release = $api->get('/api/releases/'.$release['id'])['data'] ?? $release;
+                $unansweredSince = null;
+            } catch (ApiException $exception) {
+                if (! $this->worthAnotherLook($exception)) {
+                    throw $exception;
+                }
+
+                if ($unansweredSince === null) {
+                    $unansweredSince = Carbon::now();
+
+                    if ($drawn) {
+                        $this->clearLiveLine();
+                        $drawn = false;
+                    }
+
+                    $this->line('  <fg=gray>Brewless did not answer'.($exception->status > 0 ? ' ('.$exception->status.')' : '').'. Looking again.</>');
+                } elseif ($unansweredSince->diffInSeconds(Carbon::now(), true) >= self::UNANSWERED_SECONDS) {
+                    throw new ApiException(
+                        'Brewless did not answer for '.intdiv(self::UNANSWERED_SECONDS, 60).' minutes, so following release '.($release['number'] ?? '').' stopped. The release itself goes on at Brewless; see where it is with: brewless releases',
+                        $exception->status,
+                        $exception->error,
+                    );
+                }
+            }
         }
+    }
+
+    /**
+     * A lost connection, a busy server or a server error can pass; anything
+     * else, such as a revoked token, will not.
+     */
+    private function worthAnotherLook(ApiException $exception): bool
+    {
+        return $exception->status === 0 || $exception->status === 429 || $exception->status >= 500;
     }
 
     /**

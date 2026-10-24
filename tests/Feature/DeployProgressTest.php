@@ -28,7 +28,7 @@ function rolloutSteps(array $done, array $others = []): array
  * Roll back with the release answering as given, and return all it printed,
  * colours left out but every redraw of the line kept.
  *
- * @param  list<array<string, mixed>>  $answers  what the release looks like after starting, then at each look
+ * @param  list<array<string, mixed>|int>  $answers  what the release looks like after starting, then at each look; a number is an error status
  * @param  array<string, mixed>  $options
  */
 function rollbackPrinting(array $answers, array $options = ['--ansi' => true]): string
@@ -39,7 +39,7 @@ function rollbackPrinting(array $answers, array $options = ['--ansi' => true]): 
     $sequence = Http::sequence();
 
     foreach (array_slice($answers, 1) as $answer) {
-        $sequence->push(['data' => $answer]);
+        is_int($answer) ? $sequence->push(['message' => 'Server Error'], $answer) : $sequence->push(['data' => $answer]);
     }
 
     Http::fake([
@@ -196,4 +196,41 @@ test('every step a deploy runs has a line in words, not its name', function (): 
         ->toContain('  ✓ Built files served from your storage zone')
         ->toContain('  ✓ Test address')
         ->not->toMatch('/✓ (edge|preview)\b/');
+});
+
+test('an error from Brewless while the rollout runs is looked past, and following goes on', function (): void {
+    $printed = rollbackPrinting([
+        rollbackRelease(['operation' => ['status' => 'running', 'steps' => rolloutSteps(['image'])]]),
+        500,
+        502,
+        rollbackRelease(['status' => 'active', 'operation' => ['status' => 'succeeded', 'steps' => rolloutSteps(['image', 'migrate', 'activate', 'workers'])]]),
+    ], []);
+
+    expect($printed)
+        ->toContain('Brewless did not answer (500). Looking again.')
+        ->not->toContain('(502)')
+        ->toContain('Release 4 is live.');
+});
+
+test('following stops after two minutes without an answer, and says the release goes on', function (): void {
+    $printed = rollbackPrinting([
+        rollbackRelease(['operation' => ['status' => 'running', 'steps' => rolloutSteps(['image'])]]),
+        ...array_fill(0, 45, 503),
+    ], []);
+
+    expect($printed)
+        ->toContain('Brewless did not answer (503). Looking again.')
+        ->toContain('following release 4 stopped')
+        ->toContain('brewless releases')
+        ->not->toContain('is live');
+});
+
+test('a refusal is not looked past', function (): void {
+    $printed = rollbackPrinting([
+        rollbackRelease(['operation' => ['status' => 'running', 'steps' => rolloutSteps(['image'])]]),
+        403,
+        rollbackRelease(['status' => 'active', 'operation' => ['status' => 'succeeded', 'steps' => rolloutSteps(['image', 'migrate', 'activate', 'workers'])]]),
+    ], []);
+
+    expect($printed)->not->toContain('Looking again')->not->toContain('is live');
 });
