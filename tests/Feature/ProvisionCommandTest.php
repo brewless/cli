@@ -31,7 +31,7 @@ test('provision sets the environment up, prints each step and says what is left 
         ->expectsOutputToContain('DB_USERNAME, DB_PASSWORD')
         ->assertSuccessful();
 
-    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/environments/env1/provision') && $request['database'] === 'new' && $request['queue'] === 'database' && $request['bucket'] === false && strlen($request['key']) >= 8);
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/environments/env1/provision') && $request['database'] === 'new' && $request['queue'] === 'sqs' && $request['bucket'] === false && strlen($request['key']) >= 8);
 });
 
 test('provision can leave the database out, and passes on what stops it', function (): void {
@@ -44,7 +44,7 @@ test('provision can leave the database out, and passes on what stops it', functi
         ->expectsOutputToContain('Scaleway is not connected any more.')
         ->assertFailed();
 
-    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/provision') && $request['database'] === 'none' && $request['queue'] === 'none');
+    Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/provision') && $request['database'] === 'none' && $request['queue'] === 'sqs');
 });
 
 test('an environment that has containers already is refused by the server', function (): void {
@@ -123,7 +123,7 @@ test('where the region has no Serverless SQL Database it is not offered, and an 
             'scaleway:database:rdb-1', 'Existing: main (Managed Database)', 'none', 'No database',
         ])
         ->expectsChoice('Where should the jobs of production wait?', 'sqs', [
-            'database', 'In the database: nothing extra to make', 'sqs', 'A queue at Scaleway Queues (SQS)', 'none', 'No queue: a job runs during the request',
+            'sqs', 'A queue at Scaleway Queues (SQS): the worker sleeps while there is nothing to do', 'database', 'In the database: the worker is called every minute and never sleeps, which costs more at Scaleway', 'none', 'No queue: a job runs during the request',
         ])
         ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
         ->assertSuccessful();
@@ -145,7 +145,7 @@ test('where the region has neither, Scaleway Queues is left out and without a da
             'scaleway:database:rdb-1', 'Existing: main (Managed Database)', 'none', 'No database',
         ])
         ->expectsChoice('Where should the jobs of production wait?', 'database', [
-            'database', 'In the database: nothing extra to make', 'none', 'No queue: a job runs during the request',
+            'database', 'In the database: the worker is called every minute and never sleeps, which costs more at Scaleway', 'none', 'No queue: a job runs during the request',
         ])
         ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
         ->assertSuccessful();
@@ -173,7 +173,7 @@ test('a control plane that says nothing about the region offers everything', fun
             'new', 'A new Serverless SQL Database, which sleeps while nobody uses it', 'none', 'No database',
         ])
         ->expectsChoice('Where should the jobs of production wait?', 'sqs', [
-            'database', 'In the database: nothing extra to make', 'sqs', 'A queue at Scaleway Queues (SQS)', 'none', 'No queue: a job runs during the request',
+            'sqs', 'A queue at Scaleway Queues (SQS): the worker sleeps while there is nothing to do', 'database', 'In the database: the worker is called every minute and never sleeps, which costs more at Scaleway', 'none', 'No queue: a job runs during the request',
         ])
         ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
         ->assertSuccessful();

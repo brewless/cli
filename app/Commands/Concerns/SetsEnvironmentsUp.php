@@ -55,7 +55,8 @@ trait SetsEnvironmentsUp
 
     /**
      * The plan the options describe. What is left out is the least: a new
-     * database, its jobs in that database, no bucket.
+     * database, its jobs at Scaleway Queues, no bucket. Jobs in the database
+     * keep the worker awake around the clock, so that is only chosen by name.
      *
      * @param  array<string, mixed>  $environment
      * @return array{database: string, database_resource: string|null, database_name: string|null, queue: string, bucket: bool}
@@ -63,7 +64,7 @@ trait SetsEnvironmentsUp
     protected function setupFromOptions(Api $api, array $environment): array
     {
         $database = $this->hasOption('no-database') && $this->option('no-database') === true ? 'none' : ($this->option('database') ?? ($this->option('database-resource') === null ? 'new' : 'existing'));
-        $queue = $this->option('queue') ?? ($database === 'none' ? 'none' : 'database');
+        $queue = $this->option('queue') ?? 'sqs';
 
         if (! in_array($database, self::DATABASES, true)) {
             throw new RuntimeException('Unknown database choice "'.$database.'". Use one of: '.implode(', ', self::DATABASES).'.');
@@ -147,8 +148,10 @@ trait SetsEnvironmentsUp
 
         $database = (string) select(label: 'Which database should '.$name.' use?', options: $options, default: array_key_first($options));
 
-        $queues = ($database === 'none' ? [] : ['database' => 'In the database: nothing extra to make'])
-            + ($offers['queue'] === true ? ['sqs' => 'A queue at Scaleway Queues (SQS)'] : [])
+        // Scaleway Queues first: a job wakes the worker, which sleeps in between. The database is offered
+        // with what it costs: the worker is called every minute to look for jobs, and never sleeps.
+        $queues = ($offers['queue'] === true ? ['sqs' => 'A queue at Scaleway Queues (SQS): the worker sleeps while there is nothing to do'] : [])
+            + ($database === 'none' ? [] : ['database' => 'In the database: the worker is called every minute and never sleeps, which costs more at Scaleway'])
             + ['none' => 'No queue: a job runs during the request'];
 
         // With no database and no Scaleway Queues there is nothing left to choose.

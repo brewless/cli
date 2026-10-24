@@ -41,7 +41,7 @@ final class InitCommand extends Command
         {--region= : Where new environments stand: fr-par, nl-ams, pl-waw or it-mil}
         {--database= : For every new environment: new, existing or none}
         {--database-resource= : The name of the existing database to use}
-        {--queue= : For every new environment: database, sqs or none}
+        {--queue= : For every new environment: sqs (the default), database (keeps the worker awake, costs more) or none}
         {--bucket : Make a private bucket for the files of every new environment}
         {--from-vapor : Start from the vapor.yml of this project without asking}
         {--yes : Set the new environments up without asking first}
