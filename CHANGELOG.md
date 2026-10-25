@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.16.1 (2026-10-25)
+
+- `deploy` reads `database` also in its map form (`database: {name: …, standby: true}`). Linking such a database to a new environment stopped with "Array to string conversion".
+
 ## 0.16.0 (2026-10-25)
 
 - `db:failover <environment>` switches an environment to the standby copy of its Managed Database (`database: {name, standby: true}` in `brewless.yml`). It says that the last seconds can be missing and that the old database keeps running and costing, asks, follows the switch and then the release that puts the new `DB_HOST` live. `--force` skips the question.
