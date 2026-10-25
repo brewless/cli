@@ -372,16 +372,16 @@ test('what Brewless refuses in brewless.yml at a deploy is shown with its line, 
     Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), '/releases'));
 });
 
-test('an environment the file names that does not exist yet is made and set up before the release goes onto it', function (): void {
+test('an environment the file names that does not exist yet is made and set up before the release goes onto it', function (string $database): void {
     signedIn();
     repository();
-    file_put_contents(getcwd().'/brewless.yml', <<<'YAML'
+    file_put_contents(getcwd().'/brewless.yml', <<<YAML
         organisation: acme
         application: shop
         environments:
           preview:
             kind: development
-            database: shop-preview
+            {$database}
         YAML);
 
     $withPreview = applications();
@@ -416,7 +416,11 @@ test('an environment the file names that does not exist yet is made and set up b
         ->doesntExpectOutputToContain('Bucket for files')
         ->expectsOutputToContain('Release 2 is live.')
         ->assertSuccessful();
-});
+})->with([
+    'by its name' => ['database: shop-preview'],
+    // The map form names it the same: with a standby copy, as for a Managed Database.
+    'as a map' => ["database:\n      name: shop-preview\n      standby: true"],
+]);
 
 test('a set-up that fails deploys nothing', function (): void {
     signedIn();

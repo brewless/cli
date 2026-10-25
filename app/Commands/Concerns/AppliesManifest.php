@@ -60,7 +60,7 @@ trait AppliesManifest
                 'namespace' => $running,
                 'containers' => $running,
                 'edge' => $running,
-                'database' => ! is_string($settings['database'] ?? null),
+                'database' => self::databaseName($settings) === null,
                 'queue' => ($settings['queue'] ?? null) !== 'sqs',
                 'bucket' => ! is_string($settings['storage'] ?? null),
                 'backup_bucket' => ! is_array($settings['backup'] ?? null),
@@ -84,7 +84,7 @@ trait AppliesManifest
         }
 
         if (is_array($applied['database_link'] ?? null)) {
-            $this->line('  Linking the database '.$settings['database'].' to '.$slug.', with a login of its own');
+            $this->line('  Linking the database '.(self::databaseName($settings) ?? '').' to '.$slug.', with a login of its own');
             $link = $this->followSetup($api, $applied['database_link']);
 
             if (($link['status'] ?? '') !== 'succeeded') {
@@ -161,5 +161,19 @@ trait AppliesManifest
 
             throw $exception;
         }
+    }
+
+    /**
+     * The name of the database the file names: `database: shop-main`, or the
+     * map form `database: {name: shop-main, standby: true}`.
+     *
+     * @param  array<array-key, mixed>  $settings
+     */
+    private static function databaseName(array $settings): ?string
+    {
+        $database = $settings['database'] ?? null;
+        $name = is_array($database) ? ($database['name'] ?? null) : $database;
+
+        return is_string($name) && $name !== '' ? $name : null;
     }
 }
