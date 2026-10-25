@@ -4,6 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.16.0 (2026-10-25)
+
+- `db:failover <environment>` switches an environment to the standby copy of its Managed Database (`database: {name, standby: true}` in `brewless.yml`). It says that the last seconds can be missing and that the old database keeps running and costing, asks, follows the switch and then the release that puts the new `DB_HOST` live. `--force` skips the question.
+- `deploy` shows the step for the standby copy only when `brewless.yml` asks for one.
+
 ## 0.15.0 (2026-10-24)
 
 - `init` and `provision` choose a queue at Scaleway Queues for a new environment unless you choose otherwise, also without `--queue`. A job wakes the worker, which sleeps while there is nothing to do. Jobs in the database are still offered, with what they cost: the worker is called every minute to look for them and never sleeps. Before, the database was the default.
