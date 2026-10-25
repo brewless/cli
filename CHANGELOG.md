@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.16.2 (2026-10-25)
+
+- The release that `db:failover` starts says "Image still in your registry" for its image, as a rollback does, instead of "Image built and pushed": nothing is built.
+
 ## 0.16.1 (2026-10-25)
 
 - `deploy` reads `database` also in its map form (`database: {name: …, standby: true}`). Linking such a database to a new environment stopped with "Array to string conversion".
