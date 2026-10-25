@@ -27,7 +27,11 @@ trait FollowsReleases
         'edge' => 'Edge settings checked',
         'attach_assets' => 'Built files served from your storage zone',
         'preview' => 'Test address',
+        'standby' => 'Standby copy of the database asked for',
     ];
+
+    /** Steps that only do something when brewless.yml asks: without that they have no line. */
+    private const array ONLY_WHEN_ASKED = ['standby'];
 
     private const array OVER = ['active', 'superseded', 'failed', 'cancelled'];
 
@@ -74,8 +78,8 @@ trait FollowsReleases
                     continue;
                 }
 
-                // Housekeeping around the switch that is only worth a line when it fails.
-                if ($name === 'detach_assets' && $status === 'succeeded') {
+                // Housekeeping around the switch that is only worth a line when it fails, and a step the file did not ask for.
+                if ($status === 'succeeded' && ($name === 'detach_assets' || (in_array($name, self::ONLY_WHEN_ASKED, true) && ($step['skipped'] ?? false) === true))) {
                     $printed[$name] = $status;
 
                     continue;

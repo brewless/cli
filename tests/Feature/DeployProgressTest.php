@@ -234,3 +234,17 @@ test('a refusal is not looked past', function (): void {
 
     expect($printed)->not->toContain('Looking again')->not->toContain('is live');
 });
+
+test('the standby step has a line only when brewless.yml asked for a standby copy', function (bool $skipped, bool $shown): void {
+    $done = array_map(static fn (string $name): array => ['name' => $name, 'status' => 'succeeded', 'attempts' => 1, 'error_message' => null, 'skipped' => $name === 'standby' && $skipped], ['image', 'migrate', 'activate', 'workers', 'standby']);
+
+    $screen = screen(rollbackPrinting([
+        rollbackRelease(['status' => 'active', 'operation' => ['status' => 'succeeded', 'steps' => $done]]),
+    ]));
+
+    expect(str_contains($screen, 'Standby copy of the database asked for'))->toBe($shown)
+        ->and($screen)->not->toContain('✓ standby');
+})->with([
+    'not asked for' => [true, false],
+    'asked for' => [false, true],
+]);
