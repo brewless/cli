@@ -173,7 +173,8 @@ trait FollowsReleases
     private function stepLabel(string $name, array $release): string
     {
         // A rollback builds nothing: its image step only checks the registry.
-        if ($name === 'image' && ($release['source'] ?? '') === 'rollback') {
+        // A restart (after a database switch) puts the live image back too.
+        if ($name === 'image' && in_array($release['source'] ?? '', ['rollback', 'restart'], true)) {
             return 'Image still in your registry';
         }
 

@@ -248,3 +248,13 @@ test('the standby step has a line only when brewless.yml asked for a standby cop
     'not asked for' => [true, false],
     'asked for' => [false, true],
 ]);
+
+test('a restart after a database switch says the image is still in the registry, not that it was built', function (): void {
+    $done = array_map(static fn (string $name): array => ['name' => $name, 'status' => 'succeeded', 'attempts' => 1, 'error_message' => null], ['image', 'migrate', 'activate', 'workers']);
+
+    $screen = screen(rollbackPrinting([
+        rollbackRelease(['source' => 'restart', 'status' => 'active', 'operation' => ['status' => 'succeeded', 'steps' => $done]]),
+    ]));
+
+    expect($screen)->toContain('Image still in your registry')->not->toContain('Image built and pushed');
+});
