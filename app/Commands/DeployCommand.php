@@ -26,7 +26,8 @@ final class DeployCommand extends Command
     use TalksToBrewless;
 
     protected $signature = 'deploy {environment? : The environment to deploy to, such as production; without it, default-environment in brewless.yml}
-        {--domains : Add the domains of brewless.yml the environment does not answer on yet, without asking}';
+        {--domains : Add the domains of brewless.yml the environment does not answer on yet, without asking}
+        {--mail-records : Write the DNS records the mail domain needs in a zone Brewless manages, without asking}';
 
     protected $description = 'Deploy the current commit to an environment';
 

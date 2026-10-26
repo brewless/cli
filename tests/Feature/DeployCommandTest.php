@@ -478,6 +478,48 @@ test('domains the environment lacks are added only after a yes or with --domains
     '--domains' => [['--domains' => true], null, true],
 ]);
 
+test('the dns records mail needs are written only after a yes or with --mail-records, and those of a zone kept elsewhere are named', function (array $arguments, ?bool $answer, bool $written): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', "organisation: acme\napplication: shop\nenvironments:\n  production:\n    database: false\n    domains: [shop.example.eu]\n");
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => fn (Request $request) => Http::response(['data' => ($request['mail_records'] ?? false) === true
+            ? applied(['mail_records' => ['shop.example.eu', '_dmarc.shop.example.eu'], 'missing_mail_records' => [['name' => 'p1._domainkey.other.eu', 'type' => 'TXT', 'value' => 'v=DKIM1; p=AAA', 'action' => 'add', 'in_zone' => false]]])
+            : applied(['missing_mail_records' => [
+                ['name' => 'shop.example.eu', 'type' => 'TXT', 'value' => 'v=spf1 include:_spf.tem.scaleway.com -all', 'action' => 'change', 'in_zone' => true],
+                ['name' => '_dmarc.shop.example.eu', 'type' => 'TXT', 'value' => 'v=DMARC1; p=none', 'action' => 'add', 'in_zone' => true],
+                ['name' => 'p1._domainkey.other.eu', 'type' => 'TXT', 'value' => 'v=DKIM1; p=AAA', 'action' => 'add', 'in_zone' => false],
+            ]])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
+        'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
+        'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
+    ]);
+
+    $command = $this->artisan('deploy', ['environment' => 'production', ...$arguments]);
+
+    if ($answer !== null) {
+        $command->expectsConfirmation('Write 2 DNS records so production may send mail (change shop.example.eu, add _dmarc.shop.example.eu)?', $answer ? 'yes' : 'no');
+    }
+
+    $command->expectsOutputToContain('Mail needs a TXT record at p1._domainkey.other.eu: v=DKIM1; p=AAA')
+        ->expectsOutputToContain($written ? 'Wrote 2 DNS records for mail.' : 'Not written: the mail records of production. Deploy with --mail-records')
+        ->expectsOutputToContain('Release 2 is live.')
+        ->assertSuccessful()
+        ->run();
+
+    $asked = fn (Request $request): bool => str_ends_with($request->url(), '/manifest/apply') && ($request['mail_records'] ?? false) === true;
+    $written ? Http::assertSent($asked) : Http::assertNotSent($asked);
+})->with([
+    'a yes' => [[], true, true],
+    'a no' => [[], false, false],
+    'without a terminal' => [['--no-interaction' => true], null, false],
+    '--mail-records' => [['--mail-records' => true], null, true],
+]);
+
 test('a Brewless that does not set environments up from the file yet still deploys', function (): void {
     signedIn();
     repository();

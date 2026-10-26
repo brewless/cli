@@ -104,6 +104,8 @@ trait AppliesManifest
             $this->line('  Not added: '.implode(', ', $missing).'. Deploy with --domains to add them, or run: brewless domain:add '.$slug.' '.$missing[0]);
         }
 
+        $applied = $this->mailRecords($api, $application, $manifest, $slug, $applied);
+
         foreach ($applied['domains'] ?? [] as $domain) {
             $this->line('  Adding the domain <options=bold>'.($domain['hostname'] ?? 'named in '.Project::FILE).'</>. It carries on after the deploy; its certificate comes once the DNS points the right way. See it under Domains in the console.');
         }
@@ -113,6 +115,48 @@ trait AppliesManifest
         }
 
         return true;
+    }
+
+    /**
+     * The DNS records the domain the environment sends mail from still
+     * needs. Brewless writes those of a zone it manages after a yes, or with
+     * --mail-records; the SPF record that stands gets the include, MX is
+     * never touched. Those of a zone kept elsewhere are named, to add there.
+     *
+     * @param  array<string, mixed>  $application
+     * @param  array<string, mixed>  $applied
+     * @return array<string, mixed>
+     */
+    private function mailRecords(Api $api, array $application, Manifest $manifest, string $slug, array $applied): array
+    {
+        $missing = array_values(array_filter((array) ($applied['missing_mail_records'] ?? []), is_array(...)));
+        $inZone = array_values(array_filter($missing, static fn (array $record): bool => ($record['in_zone'] ?? false) === true));
+        $elsewhere = array_values(array_filter($missing, static fn (array $record): bool => ($record['in_zone'] ?? false) !== true));
+
+        foreach ($elsewhere as $record) {
+            $this->line('  Mail needs a '.($record['type'] ?? 'TXT').' record at <options=bold>'.($record['name'] ?? '').'</>: '.($record['value'] ?? '').'. Add it where the DNS of the domain is kept; mail sends once Scaleway has checked it.');
+        }
+
+        if ($inZone === []) {
+            return $applied;
+        }
+
+        $write = $this->option('mail-records') === true || ($this->input->isInteractive() && confirm(
+            label: 'Write '.count($inZone).' DNS record'.(count($inZone) === 1 ? '' : 's').' so '.$slug.' may send mail ('.implode(', ', array_map(static fn (array $record): string => ($record['action'] ?? 'add').' '.($record['name'] ?? ''), $inZone)).')?',
+            default: false,
+            hint: 'An SPF record that stands keeps what it says and gets the include of Scaleway; MX records stay as they are.',
+        ));
+
+        if (! $write) {
+            $this->line('  Not written: the mail records of '.$slug.'. Deploy with --mail-records to write them, or add them yourself.');
+
+            return $applied;
+        }
+
+        $applied = $this->sendManifest($api, $application, $manifest, $slug, mailRecords: true) ?: $applied;
+        $this->line('  Wrote '.count((array) ($applied['mail_records'] ?? [])).' DNS records for mail. Scaleway checks them again; that takes a few minutes.');
+
+        return $applied;
     }
 
     /**
@@ -144,10 +188,10 @@ trait AppliesManifest
      * @param  array<string, mixed>  $application
      * @return array<string, mixed>|false|null
      */
-    private function sendManifest(Api $api, array $application, Manifest $manifest, string $slug, bool $domains = false): array|false|null
+    private function sendManifest(Api $api, array $application, Manifest $manifest, string $slug, bool $domains = false, bool $mailRecords = false): array|false|null
     {
         try {
-            return $api->post('/api/applications/'.$application['id'].'/manifest/apply', ['environment' => $slug, 'manifest' => $manifest->data, ...($domains ? ['domains' => true] : [])])['data'] ?? [];
+            return $api->post('/api/applications/'.$application['id'].'/manifest/apply', ['environment' => $slug, 'manifest' => $manifest->data, ...($domains ? ['domains' => true] : []), ...($mailRecords ? ['mail_records' => true] : [])])['data'] ?? [];
         } catch (ApiException $exception) {
             if ($exception->status === 404) {
                 $this->components->warn('This Brewless does not set environments up from '.Project::FILE.' yet. The release is deployed to the environment as it stands.');

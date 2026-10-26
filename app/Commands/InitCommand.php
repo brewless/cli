@@ -43,6 +43,7 @@ final class InitCommand extends Command
         {--database-resource= : The name of the existing database to use}
         {--queue= : For every new environment: sqs (the default), database (keeps the worker awake, costs more) or none}
         {--bucket : Make a private bucket for the files of every new environment}
+        {--mail= : The mailer of a new production environment: scaleway (Transactional Email, the default), lettermint (your own account) or none}
         {--from-vapor : Start from the vapor.yml of this project without asking}
         {--yes : Set the new environments up without asking first}
         {--force : Overwrite an existing brewless.yml}';
@@ -115,6 +116,19 @@ final class InitCommand extends Command
                 // The environments that were added stand in a region now: the file says which.
                 $regions = array_column(array_filter($added, static fn (array $environment): bool => is_string($environment['region'] ?? null)), 'region', 'slug');
                 $project->write($directory, $vapor->manifest($framework, $regions));
+            }
+
+            $mail = $this->mail($added);
+
+            if ($mail !== []) {
+                $manifest = $vapor?->manifest($framework, array_column(array_filter($added, static fn (array $environment): bool => is_string($environment['region'] ?? null)), 'region', 'slug')) ?? [];
+
+                foreach ($mail as $slug => $mailer) {
+                    $manifest['environments'][$slug]['mail'] = $mailer;
+                }
+
+                $project->write($directory, $manifest);
+                $this->components->info('brewless.yml sets the mailer of '.implode(' and ', array_keys($mail)).'; the first deploy sets it up.');
             }
 
             $ready = $added === [] ? [] : $this->setEnvironmentsUp($api, $added, $vapor);
@@ -206,6 +220,40 @@ final class InitCommand extends Command
         $this->components->info('Added '.implode(' and ', array_column($added, 'slug')).' in '.self::REGIONS[$region].'.');
 
         return $added;
+    }
+
+    /**
+     * The mailer each new production environment gets in brewless.yml:
+     * Scaleway Transactional Email unless asked otherwise, Lettermint with
+     * the customer's own account, or none (`mail: false`), which keeps a
+     * MAIL_MAILER of the application's own. Other kinds get no mailer.
+     *
+     * @param  list<array<string, mixed>>  $added
+     * @return array<string, string|false> environment => mailer
+     */
+    private function mail(array $added): array
+    {
+        $production = array_values(array_filter(array_column(array_filter($added, static fn (array $environment): bool => ($environment['kind'] ?? null) === 'production'), 'slug'), is_string(...)));
+
+        if ($production === []) {
+            return [];
+        }
+
+        $choice = $this->option('mail') ?? ($this->input->isInteractive() ? select(
+            label: 'Which mailer should '.implode(' and ', $production).' send with?',
+            options: [
+                'scaleway' => 'Scaleway Transactional Email, in your Scaleway project (the default)',
+                'lettermint' => 'Lettermint, with your own account',
+                'none' => 'None: keep the MAIL_MAILER of the application',
+            ],
+            default: 'scaleway',
+        ) : 'scaleway');
+
+        if (! in_array($choice, ['scaleway', 'lettermint', 'none'], true)) {
+            throw new RuntimeException('Unknown mailer "'.$choice.'". Use one of: scaleway, lettermint, none.');
+        }
+
+        return array_fill_keys($production, $choice === 'none' ? false : $choice);
     }
 
     /**

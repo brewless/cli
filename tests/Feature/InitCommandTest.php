@@ -83,6 +83,7 @@ test('init adds production and staging, asks what they should have and sets them
         ->expectsQuestion('What is the application called?', 'privasearch')
         ->expectsQuestion('Which environments should it have?', ['production', 'staging'])
         ->expectsQuestion('In which region?', 'nl-ams')
+        ->expectsQuestion('Which mailer should production send with?', 'scaleway')
         ->expectsQuestion('Which database should production use?', 'new')
         ->expectsQuestion('Where should the jobs of production wait?', 'sqs')
         ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'yes')
@@ -107,6 +108,7 @@ test('saying no at the end makes nothing and says how to do it later', function 
         ->expectsQuestion('What is the application called?', 'privasearch')
         ->expectsQuestion('Which environments should it have?', ['production'])
         ->expectsQuestion('In which region?', 'fr-par')
+        ->expectsQuestion('Which mailer should production send with?', 'scaleway')
         ->expectsQuestion('Which database should production use?', 'none')
         ->expectsQuestion('Where should the jobs of production wait?', 'none')
         ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
@@ -163,6 +165,7 @@ test('a vapor.yml can be the starting point: its environments, its PHP version a
         ->expectsQuestion('What is the application called?', 'privasearch')
         ->expectsQuestion('Which environments should it have?', ['production', 'staging'])
         ->expectsQuestion('In which region?', 'fr-par')
+        ->expectsQuestion('Which mailer should production send with?', 'scaleway')
         ->expectsConfirmation('Make this now?', 'yes')
         ->expectsOutputToContain('brewless domain:add production privasearch.example')
         ->expectsOutputToContain('`brewless env:pull <environment>`, add yours from Vapor, then `brewless env:push <environment>`')
@@ -202,6 +205,7 @@ test('the same way is not offered when the next environment\'s region cannot mak
         ->expectsQuestion('What is the application called?', 'privasearch')
         ->expectsQuestion('Which environments should it have?', ['production', 'staging'])
         ->expectsQuestion('In which region?', 'fr-par')
+        ->expectsQuestion('Which mailer should production send with?', 'scaleway')
         ->expectsQuestion('Which database should production use?', 'new')
         ->expectsQuestion('Where should the jobs of production wait?', 'database')
         ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
@@ -440,14 +444,45 @@ test('the environments init adds from a vapor.yml get their region in brewless.y
         ->expectsQuestion('What is the application called?', 'privasearch')
         ->expectsQuestion('Which environments should it have?', ['production'])
         ->expectsQuestion('In which region?', 'nl-ams')
+        ->expectsQuestion('Which mailer should production send with?', 'scaleway')
         ->expectsConfirmation('Make this now?', 'no')
         ->assertSuccessful();
 
     // Staging was not added, so it has no region yet; it stays in the file as vapor.yml has it.
     expect(Yaml::parseFile($this->project.'/brewless.yml')['environments'])->toBe([
-        'production' => ['kind' => 'production', 'region' => 'nl-ams', 'web' => ['memory' => 2048], 'queue' => 'sqs'],
+        'production' => ['kind' => 'production', 'region' => 'nl-ams', 'web' => ['memory' => 2048], 'queue' => 'sqs', 'mail' => 'scaleway'],
         'staging' => ['kind' => 'staging', 'queue' => false],
     ]);
+});
+
+test('the mailer of a new production environment goes into brewless.yml: transactional email by default, lettermint, or none to keep the mailer of the application', function (string $choice, string|false $written): void {
+    signedIn('acme');
+    Http::fake([
+        '*/cli/api/applications' => Http::response(['data' => [['id' => 'app9', 'slug' => 'shop', 'environments' => []]]]),
+        '*/applications/app9/environments' => Http::response(['data' => ['id' => 'env-production', 'slug' => 'production', 'kind' => 'production', 'region' => 'fr-par']], 201),
+    ]);
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'fr-par', '--mail' => $choice, '--no-interaction' => true])
+        ->expectsOutputToContain('brewless.yml sets the mailer of production; the first deploy sets it up.')
+        ->assertSuccessful();
+
+    expect(Yaml::parseFile($this->project.'/brewless.yml')['environments']['production']['mail'])->toBe($written);
+})->with([
+    'transactional email' => ['scaleway', 'scaleway'],
+    'lettermint' => ['lettermint', 'lettermint'],
+    'none' => ['none', false],
+]);
+
+test('a mailer brewless does not know is refused', function (): void {
+    signedIn('acme');
+    Http::fake([
+        '*/cli/api/applications' => Http::response(['data' => [['id' => 'app9', 'slug' => 'shop', 'environments' => []]]]),
+        '*/applications/app9/environments' => Http::response(['data' => ['id' => 'env-production', 'slug' => 'production', 'kind' => 'production', 'region' => 'fr-par']], 201),
+    ]);
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'fr-par', '--mail' => 'ses', '--no-interaction' => true])
+        ->expectsOutputToContain('Unknown mailer "ses". Use one of: scaleway, lettermint, none.')
+        ->assertFailed();
 });
 
 /**
