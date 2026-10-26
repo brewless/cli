@@ -101,8 +101,13 @@ A script names everything and is asked nothing:
 
 ```bash
 brewless init --application=shop --environments=production,staging --region=fr-par \
-    --database=new --queue=sqs --bucket --yes --no-interaction
+    --database=new --queue=sqs --bucket --mail=scaleway --yes --no-interaction
 ```
+
+A new production environment is asked for its mailer: Scaleway Transactional
+Email (`--mail=scaleway`, the default), Lettermint with your own account
+(`--mail=lettermint`), or none (`--mail=none`, which keeps the `MAIL_MAILER` of
+your application). The answer goes into `brewless.yml` as `mail`.
 
 ### Coming from Laravel Vapor
 
@@ -134,7 +139,9 @@ can build are listed when you ask for one it cannot.
    an environment it names that does not exist yet is made and set up, an
    environment that runs gets the database, queue or bucket it is missing,
    and the domains it does not answer on yet are added after a yes (or with
-   `--domains`), since a domain can move visitors. What stands is never
+   `--domains`), since a domain can move visitors. The DNS records the mail
+   domain still needs are written after a yes too (or with `--mail-records`)
+   when Brewless manages its zone, and named otherwise. What stands is never
    switched for something else; that is refused with its line, and nothing is
    deployed.
 1. The current commit is packed (`git archive`): only what is committed is deployed.
