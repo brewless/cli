@@ -4,6 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `init` asks a Laravel application how long the edge may keep its public pages (an hour, a day, or not at all) and writes it into `brewless.yml` as `edge.cache` for every new environment (BL-193). `--edge-cache=1h|1d|30m|<seconds>|0` says it without a question; a script that says nothing gets `1h`. More than seven days, or a unit other than `m`, `h` or `d`, is refused. Another framework is only given `edge.cache` when `--edge-cache` names it.
+- When the project's `composer.lock` holds `brewless/laravel` older than 0.18, `init` says that it sends a session cookie on every page, so the edge keeps none, and how to update.
+
 ## 0.16.2 (2026-10-25)
 
 - The release that `db:failover` starts says "Image still in your registry" for its image, as a rollback does, instead of "Image built and pushed": nothing is built.

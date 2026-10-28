@@ -101,13 +101,23 @@ A script names everything and is asked nothing:
 
 ```bash
 brewless init --application=shop --environments=production,staging --region=fr-par \
-    --database=new --queue=sqs --bucket --mail=scaleway --yes --no-interaction
+    --database=new --queue=sqs --bucket --mail=scaleway --edge-cache=1h --yes --no-interaction
 ```
 
 A new production environment is asked for its mailer: Scaleway Transactional
 Email (`--mail=scaleway`, the default), Lettermint with your own account
 (`--mail=lettermint`), or none (`--mail=none`, which keeps the `MAIL_MAILER` of
 your application). The answer goes into `brewless.yml` as `mail`.
+
+A Laravel application is asked how long the edge (bunny.net) may keep its
+public pages: an hour (the default), a day, or not at all. The answer goes into
+`brewless.yml` as `edge.cache` for every new environment. Every deploy empties
+the edge, so an hour or a day only matters between deploys. `--edge-cache=1h`,
+`1d`, `30m`, a number of seconds or `0` says it without a question; a script
+that says nothing gets an hour. Only pages that are the same for every visitor
+are kept (no session, no cookie, nobody signed in); `brewless/laravel` 0.18
+and up lets a page that needs no session go without, and `init` says so when
+the project has an older one.
 
 ### Coming from Laravel Vapor
 

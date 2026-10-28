@@ -44,6 +44,7 @@ final class InitCommand extends Command
         {--queue= : For every new environment: sqs (the default), database (keeps the worker awake, costs more) or none}
         {--bucket : Make a private bucket for the files of every new environment}
         {--mail= : The mailer of a new production environment: scaleway (Transactional Email, the default), lettermint (your own account) or none}
+        {--edge-cache= : How long the edge may keep the public pages of every new environment: 1h (the default), 1d, 0 for not at all, or a number of seconds, minutes (30m), hours or days, up to 7d}
         {--from-vapor : Start from the vapor.yml of this project without asking}
         {--yes : Set the new environments up without asking first}
         {--force : Overwrite an existing brewless.yml}';
@@ -119,16 +120,28 @@ final class InitCommand extends Command
             }
 
             $mail = $this->mail($added);
+            $edge = $this->edgeCache($framework, $added);
 
-            if ($mail !== []) {
+            if ($mail !== [] || $edge !== []) {
                 $manifest = $vapor?->manifest($framework, array_column(array_filter($added, static fn (array $environment): bool => is_string($environment['region'] ?? null)), 'region', 'slug')) ?? [];
 
                 foreach ($mail as $slug => $mailer) {
                     $manifest['environments'][$slug]['mail'] = $mailer;
                 }
 
+                foreach ($edge as $slug => $cache) {
+                    $manifest['environments'][$slug]['edge'] = ['cache' => $cache];
+                }
+
                 $project->write($directory, $manifest);
-                $this->components->info('brewless.yml sets the mailer of '.implode(' and ', array_keys($mail)).'; the first deploy sets it up.');
+
+                if ($mail !== []) {
+                    $this->components->info('brewless.yml sets the mailer of '.implode(' and ', array_keys($mail)).'; the first deploy sets it up.');
+                }
+
+                if ($edge !== []) {
+                    $this->edgeCacheSaid($directory, $edge);
+                }
             }
 
             $ready = $added === [] ? [] : $this->setEnvironmentsUp($api, $added, $vapor);
@@ -254,6 +267,106 @@ final class InitCommand extends Command
         }
 
         return array_fill_keys($production, $choice === 'none' ? false : $choice);
+    }
+
+    /**
+     * How long the edge may keep the public pages of each new environment
+     * (`edge.cache` in brewless.yml): what --edge-cache says, else asked
+     * once for all of them, else an hour. Only a Laravel application is
+     * asked, because brewless/laravel is what reads it; another framework
+     * gets it only when --edge-cache names it.
+     *
+     * @param  list<array<string, mixed>>  $added
+     * @return array<string, int|string> environment => cache time as brewless.yml writes it
+     */
+    private function edgeCache(string $framework, array $added): array
+    {
+        $environments = array_values(array_filter(array_column($added, 'slug'), is_string(...)));
+        $given = $this->option('edge-cache');
+
+        if ($environments === [] || (! is_string($given) && $framework !== 'laravel')) {
+            return [];
+        }
+
+        $choice = is_string($given) ? $given : ($this->input->isInteractive() ? (string) select(
+            label: 'May the edge keep public pages, and for how long?',
+            options: [
+                '1h' => '1 hour (recommended): every deploy empties the edge, so a page is at most an hour old between deploys',
+                '1d' => '1 day: the container sleeps most, a page from the database can be a day old',
+                'none' => 'Not at all',
+            ],
+            default: '1h',
+            hint: 'Only pages that are the same for every visitor: no session, no cookie, nobody signed in.',
+        ) : '1h');
+
+        return array_fill_keys($environments, self::cacheTime($choice === 'none' ? '0' : $choice));
+    }
+
+    /**
+     * A cache time as brewless.yml takes it: `0`, a number of seconds, or a
+     * number with m, h or d. Brewless refuses more than seven days.
+     */
+    private static function cacheTime(string $given): int|string
+    {
+        $value = strtolower(trim($given));
+
+        if (preg_match('/\A(\d+)([mhd]?)\z/', $value, $parts) !== 1) {
+            throw new RuntimeException('Unknown edge cache time "'.$given.'". Use 0, a number of seconds, or a number with m, h or d, such as 1h or 1d.');
+        }
+
+        $seconds = (int) $parts[1] * match ($parts[2]) {
+            'm' => 60,
+            'h' => 3600,
+            'd' => 86400,
+            default => 1,
+        };
+
+        if ($seconds > 7 * 86400) {
+            throw new RuntimeException('The edge keeps a page at most 7 days; "'.$given.'" is longer.');
+        }
+
+        return $parts[2] === '' ? $seconds : $value;
+    }
+
+    /**
+     * Say what brewless.yml now says about the edge, and that an older
+     * brewless/laravel still sends a session cookie on every page.
+     *
+     * @param  array<string, int|string>  $edge
+     */
+    private function edgeCacheSaid(string $directory, array $edge): void
+    {
+        $cache = array_values($edge)[0];
+
+        if ($cache === 0) {
+            $this->components->info('brewless.yml keeps the public pages of '.implode(' and ', array_keys($edge)).' out of the edge.');
+
+            return;
+        }
+
+        $this->components->info('brewless.yml lets the edge keep the public pages of '.implode(' and ', array_keys($edge)).' for '.$cache.(is_int($cache) ? ' seconds' : '').'.');
+
+        $version = self::lockedVersion($directory, 'brewless/laravel');
+
+        if ($version !== null && version_compare(ltrim($version, 'v'), '0.18.0', '<')) {
+            $this->line('  brewless/laravel '.$version.' sends a session cookie on every page in the web group, so the edge keeps none of them. From 0.18 a page that needs no session goes without: composer require brewless/laravel:^0.18');
+        }
+    }
+
+    /**
+     * The version composer.lock holds of a package, or null.
+     */
+    private static function lockedVersion(string $directory, string $package): ?string
+    {
+        $lock = json_decode((string) @file_get_contents($directory.'/composer.lock'), true);
+
+        foreach (is_array($lock) ? [...($lock['packages'] ?? []), ...($lock['packages-dev'] ?? [])] : [] as $candidate) {
+            if (is_array($candidate) && ($candidate['name'] ?? null) === $package && is_string($candidate['version'] ?? null)) {
+                return $candidate['version'];
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -539,3 +539,90 @@ test('with one project nothing is asked and none is sent', function (): void {
 
     Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && ! array_key_exists('provider_connection_id', $request->data()));
 });
+
+/**
+ * An application without environments that gets a production environment, in a Laravel project.
+ */
+function laravelShop(object $test, ?string $package = null): void
+{
+    signedIn('acme');
+    file_put_contents($test->project.'/composer.json', json_encode(['require' => ['laravel/framework' => '^13.0']]));
+
+    if ($package !== null) {
+        file_put_contents($test->project.'/composer.lock', json_encode(['packages' => [['name' => 'brewless/laravel', 'version' => $package]]]));
+    }
+
+    Http::fake([
+        '*/cli/api/applications' => Http::response(['data' => [['id' => 'app9', 'slug' => 'shop', 'environments' => []]]]),
+        '*/applications/app9/environments' => fn (Request $request) => Http::response(['data' => ['id' => 'env-'.strtolower($request['name']), 'slug' => strtolower($request['name']), 'kind' => $request['kind'], 'region' => $request['region']]], 201),
+    ]);
+}
+
+test('init asks a Laravel application how long the edge may keep public pages, once for every new environment', function (): void {
+    laravelShop($this, 'v0.17.1');
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production,staging', '--region' => 'fr-par', '--mail' => 'scaleway', '--database' => 'none', '--queue' => 'none'])
+        ->expectsQuestion('May the edge keep public pages, and for how long?', '1d')
+        ->expectsOutputToContain('brewless.yml lets the edge keep the public pages of production and staging for 1d.')
+        ->expectsOutputToContain('composer require brewless/laravel:^0.18')
+        ->expectsConfirmation('Make this now?', 'no')
+        ->assertSuccessful();
+
+    $environments = Yaml::parseFile($this->project.'/brewless.yml')['environments'];
+
+    expect($environments['production'])->toBe(['mail' => 'scaleway', 'edge' => ['cache' => '1d']])
+        ->and($environments['staging'])->toBe(['edge' => ['cache' => '1d']]);
+});
+
+test('--edge-cache says it without a question, and a script that names none gets an hour', function (array $options, int|string $written): void {
+    laravelShop($this, 'v0.18.0');
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'fr-par', '--mail' => 'scaleway', '--no-interaction' => true, ...$options])
+        ->doesntExpectOutputToContain('composer require brewless/laravel')
+        ->assertSuccessful();
+
+    expect(Yaml::parseFile($this->project.'/brewless.yml')['environments']['production']['edge'])->toBe(['cache' => $written]);
+})->with([
+    'nothing named' => [[], '1h'],
+    'a day' => [['--edge-cache' => '1d'], '1d'],
+    'minutes' => [['--edge-cache' => '30M'], '30m'],
+    'seconds' => [['--edge-cache' => '600'], 600],
+    'not at all' => [['--edge-cache' => '0'], 0],
+]);
+
+test('not at all keeps the pages out of the edge and gives no advice about the package', function (): void {
+    laravelShop($this, 'v0.17.1');
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'fr-par', '--mail' => 'scaleway', '--edge-cache' => '0', '--no-interaction' => true])
+        ->expectsOutputToContain('brewless.yml keeps the public pages of production out of the edge.')
+        ->doesntExpectOutputToContain('composer require brewless/laravel')
+        ->assertSuccessful();
+});
+
+test('an edge cache time brewless does not take is refused', function (string $given, string $message): void {
+    laravelShop($this);
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'fr-par', '--mail' => 'scaleway', '--edge-cache' => $given, '--no-interaction' => true])
+        ->expectsOutputToContain($message)
+        ->assertFailed();
+})->with([
+    'longer than a week' => ['8d', 'The edge keeps a page at most 7 days; "8d" is longer.'],
+    'no unit brewless knows' => ['soon', 'Unknown edge cache time "soon".'],
+    'a week in seconds and one more' => ['604801', 'is longer.'],
+]);
+
+test('another framework is not asked about the edge, unless --edge-cache names it', function (): void {
+    signedIn('acme');
+    Http::fake([
+        '*/cli/api/applications' => Http::response(['data' => [['id' => 'app9', 'slug' => 'shop', 'environments' => []]]]),
+        '*/applications/app9/environments' => Http::response(['data' => ['id' => 'env-production', 'slug' => 'production', 'kind' => 'production', 'region' => 'fr-par']], 201),
+    ]);
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'fr-par', '--mail' => 'scaleway', '--no-interaction' => true])->assertSuccessful();
+
+    expect(Yaml::parseFile($this->project.'/brewless.yml')['environments']['production'])->not->toHaveKey('edge');
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'fr-par', '--mail' => 'scaleway', '--edge-cache' => '1h', '--no-interaction' => true, '--force' => true])->assertSuccessful();
+
+    expect(Yaml::parseFile($this->project.'/brewless.yml')['environments']['production']['edge'])->toBe(['cache' => '1h']);
+});
