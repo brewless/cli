@@ -28,10 +28,12 @@ trait FollowsReleases
         'attach_assets' => 'Built files served from your storage zone',
         'preview' => 'Test address',
         'standby' => 'Standby copy of the database asked for',
+        'edge_warm' => 'Edge warmed',
+        'mail_events' => 'Mail events subscribed',
     ];
 
     /** Steps that only do something when brewless.yml asks: without that they have no line. */
-    private const array ONLY_WHEN_ASKED = ['standby'];
+    private const array ONLY_WHEN_ASKED = ['standby', 'edge_warm'];
 
     private const array OVER = ['active', 'superseded', 'failed', 'cancelled'];
 
@@ -86,7 +88,9 @@ trait FollowsReleases
                 }
 
                 $printed[$name] = $status;
-                $label = $this->stepLabel($name, $release);
+                // What the step did, when Brewless says it in a few words: "216 pages".
+                $summary = is_string($step['summary'] ?? null) && $step['summary'] !== '' && $status === 'succeeded' ? '  '.OutputFormatter::escape($step['summary']) : '';
+                $label = $this->stepLabel($name, $release).$summary;
                 $elapsed = sprintf('%3ds', (int) $started->diffInSeconds(Carbon::now(), true));
 
                 if ($drawn) {

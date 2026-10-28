@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- A release shows the warm-up of the edge as `Edge warmed  216 pages` (with the pages that failed or were left out), and no line when there was nothing to warm (BL-195). The step that subscribes mail events reads `Mail events subscribed` instead of its name.
+
 ## 0.18.0 (2026-10-28)
 
 - `brewless plan` shows an advice line (`*`) with what stands and Brewless's advice under it, such as a homepage the edge cannot keep (BL-192).

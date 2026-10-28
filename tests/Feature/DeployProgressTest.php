@@ -258,3 +258,19 @@ test('a restart after a database switch says the image is still in the registry,
 
     expect($screen)->toContain('Image still in your registry')->not->toContain('Image built and pushed');
 });
+
+test('the warm-up says how many pages it asked, and has no line when there was nothing to warm', function (bool $skipped, bool $shown): void {
+    $done = array_map(static fn (string $name): array => ['name' => $name, 'status' => 'succeeded', 'attempts' => 1, 'error_message' => null, 'skipped' => $name === 'edge_warm' && $skipped, 'summary' => $name === 'edge_warm' && ! $skipped ? '216 pages, 2 failed' : null], ['image', 'migrate', 'activate', 'workers', 'edge', 'attach_assets', 'edge_warm', 'mail_events']);
+
+    $screen = screen(rollbackPrinting([
+        rollbackRelease(['status' => 'active', 'operation' => ['status' => 'succeeded', 'steps' => $done]]),
+    ]));
+
+    expect(str_contains($screen, '✓ Edge warmed  216 pages, 2 failed'))->toBe($shown)
+        ->and($screen)->not->toContain('✓ edge_warm')
+        ->and($screen)->toContain('✓ Mail events subscribed')
+        ->and($screen)->not->toContain('✓ mail_events');
+})->with([
+    'warmed' => [false, true],
+    'nothing to warm' => [true, false],
+]);
