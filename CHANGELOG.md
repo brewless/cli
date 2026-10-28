@@ -6,6 +6,8 @@ change how a command behaves.
 
 ## Unreleased
 
+- `brewless plan` shows an advice line (`*`) with what stands and Brewless's advice under it, such as a homepage the edge cannot keep (BL-192).
+
 - `init` asks a Laravel application how long the edge may keep its public pages (an hour, a day, or not at all) and writes it into `brewless.yml` as `edge.cache` for every new environment (BL-193). `--edge-cache=1h|1d|30m|<seconds>|0` says it without a question; a script that says nothing gets `1h`. More than seven days, or a unit other than `m`, `h` or `d`, is refused. Another framework is only given `edge.cache` when `--edge-cache` names it.
 - When the project's `composer.lock` holds `brewless/laravel` older than 0.18, `init` says that it sends a session cookie on every page, so the edge keeps none, and how to update.
 

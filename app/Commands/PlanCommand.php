@@ -24,7 +24,7 @@ final class PlanCommand extends Command
     protected $description = 'Show what brewless.yml asks for next to what stands now. Changes nothing';
 
     /** How a line of the plan starts, by what it would do. */
-    private const array MARKS = ['same' => '=', 'change' => '~', 'add' => '+', 'kept' => '·', 'unknown' => '?', 'refused' => '!'];
+    private const array MARKS = ['same' => '=', 'change' => '~', 'add' => '+', 'kept' => '·', 'unknown' => '?', 'refused' => '!', 'advice' => '*'];
 
     public function handle(): int
     {
@@ -87,6 +87,8 @@ final class PlanCommand extends Command
                 'add' => ($line['key'] === 'environment' ? 'a new '.$line['wanted'].' environment' : 'add '.($line['wanted'] ?? '')),
                 'kept' => ($line['current'] ?? '').' is not in '.Project::FILE.'; it stays',
                 'refused' => ($line['wanted'] ?? '').': '.($line['reason'] ?? 'a deploy would refuse this'),
+                // Not a change: what stands, with what Brewless advises under it (the note).
+                'advice' => (string) ($line['current'] ?? ''),
                 default => ($line['wanted'] ?? '').' (what stands cannot be read)',
             };
 

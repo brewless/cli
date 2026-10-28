@@ -41,6 +41,7 @@ function planAnswer(): array
                 ['key' => 'database', 'current' => null, 'wanted' => 'shop-main', 'state' => 'add', 'applied_on_deploy' => false],
                 ['key' => 'domains', 'current' => null, 'wanted' => 'shop.example.eu', 'state' => 'unknown', 'applied_on_deploy' => false],
                 ['key' => 'variables.APP_LOCALE', 'current' => null, 'wanted' => 'nl', 'state' => 'refused', 'reason' => 'The variables of this environment are not kept through Brewless yet.', 'applied_on_deploy' => true],
+                ['key' => 'edge.homepage', 'current' => 'sets a cookie: shop_session', 'wanted' => 'kept at the edge', 'state' => 'advice', 'note' => 'Take the session off the public routes.', 'applied_on_deploy' => true],
             ]],
             ['name' => 'staging', 'exists' => false, 'lines' => [
                 ['key' => 'environment', 'current' => null, 'wanted' => 'staging', 'state' => 'add', 'applied_on_deploy' => false],
@@ -61,6 +62,8 @@ test('plan sends the whole file, php as text, and shows per environment what wou
         ->expectsOutputToContain('~ web.memory               512 → 1024')
         ->expectsOutputToContain('+ database                 add shop-main (not applied by a deploy yet)')
         ->expectsOutputToContain('! variables.APP_LOCALE     nl: The variables of this environment are not kept through Brewless yet.')
+        ->expectsOutputToContain('* edge.homepage            sets a cookie: shop_session')
+        ->expectsOutputToContain('Take the session off the public routes.')
         ->expectsOutputToContain('= php                      8.4')
         ->expectsOutputToContain('? domains                  shop.example.eu (what stands cannot be read)')
         ->expectsOutputToContain('staging (not at Brewless yet)')
