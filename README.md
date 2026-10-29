@@ -62,6 +62,24 @@ brewless export production   # everything Brewless knows, as a folder with Terra
 brewless detach production   # Brewless stops managing it; it keeps running
 ```
 
+### Files from another S3 bucket
+
+`storage:import` copies the files of a bucket at AWS, or at any other S3
+service, into the bucket of an environment. It never removes anything, and a
+file that is there already is left alone, so running it again copies only what
+is new. By default rclone does the copy in a job of your own Scaleway project;
+`--local` copies through this machine instead.
+
+```bash
+brewless storage:import production --from-env=../old-app/.env       # the AWS_* lines of the old application
+SOURCE_AWS_ACCESS_KEY_ID=… SOURCE_AWS_SECRET_ACCESS_KEY=… \
+  brewless storage:import production s3://my-bucket/uploads --source-region=eu-west-1
+brewless storage:import production s3://my-bucket --source-profile=migration --dry-run
+brewless storage:status production                                   # how far the last copy got
+```
+
+See https://docs.brewless.eu/applications/moving-files.
+
 ### DNS
 
 The records of a zone at Bunny DNS that Brewless manages for one of your
