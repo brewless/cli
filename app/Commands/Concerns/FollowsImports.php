@@ -8,12 +8,27 @@ use App\Support\Api;
 use Illuminate\Support\Sleep;
 
 /**
- * Following a copy into an environment's bucket that runs in the
- * customer's project (the operation `storage.import`): how far it got while
- * it runs, what it came to when it ends. Stopping to follow it stops nothing.
+ * Following a copy that runs in the customer's project (the operations
+ * `storage.import` and `database.import`): how far it got while it runs,
+ * what it came to when it ends. Stopping to follow it stops nothing.
  */
 trait FollowsImports
 {
+    /**
+     * What is said about a copy of this kind. A copy of files by default;
+     * a command for another kind of copy gives its own words.
+     *
+     * @return array{status: string, deleted: string, cancelled: string}
+     */
+    protected function importWords(): array
+    {
+        return [
+            'status' => 'storage:status',
+            'deleted' => 'The keys of the copy were deleted from your Secret Manager.',
+            'cancelled' => 'The copy was cancelled. What was copied stays in the bucket.',
+        ];
+    }
+
     /**
      * Follow until the copy ends. True when it succeeded.
      *
@@ -56,12 +71,12 @@ trait FollowsImports
         return match ($operation['status'] ?? '') {
             'succeeded' => (function () use ($result): bool {
                 $this->components->info(is_string($result['summary'] ?? null) ? $result['summary'] : 'The copy is done.');
-                $this->line('  The keys of the copy were deleted from your Secret Manager.');
+                $this->line('  '.$this->importWords()['deleted']);
 
                 return true;
             })(),
             'cancelled' => (function (): bool {
-                $this->components->warn('The copy was cancelled. What was copied stays in the bucket.');
+                $this->components->warn($this->importWords()['cancelled']);
 
                 return false;
             })(),
@@ -140,7 +155,7 @@ trait FollowsImports
         pcntl_async_signals(true);
         pcntl_signal(SIGINT, function () use ($slug): void {
             $this->newLine(2);
-            $this->line('  The copy goes on in your Scaleway project. Look again with: brewless storage:status '.$slug);
+            $this->line('  The copy goes on in your Scaleway project. Look again with: brewless '.$this->importWords()['status'].' '.$slug);
 
             exit(self::SUCCESS);
         });
