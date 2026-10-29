@@ -68,7 +68,7 @@ test('provision asks what the environment should have when nothing was said', fu
     $this->artisan('provision', ['environment' => 'production'])
         ->expectsQuestion('Which database should production use?', 'scaleway:database:rdb-1')
         ->expectsQuestion('Where should the jobs of production wait?', 'sqs')
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('A private bucket for the files of production?', 'no')
         ->expectsOutputToContain('Queue')
         ->doesntExpectOutputToContain('Bucket for files')
         ->expectsOutputToContain('DB_DATABASE')
@@ -123,9 +123,9 @@ test('where the region has no Serverless SQL Database it is not offered, and an 
             'scaleway:database:rdb-1', 'Existing: main (Managed Database)', 'none', 'No database',
         ])
         ->expectsChoice('Where should the jobs of production wait?', 'sqs', [
-            'sqs', 'A queue at Scaleway Queues (SQS): the worker sleeps while there is nothing to do', 'database', 'In the database: the worker is called every minute and never sleeps, which costs more at Scaleway', 'none', 'No queue: a job runs during the request',
+            'sqs', 'Scaleway Queues (SQS): the worker sleeps when idle', 'database', 'In the database: the worker never sleeps (costs more)', 'none', 'No queue: a job runs during the request',
         ])
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('A private bucket for the files of production?', 'no')
         ->assertSuccessful();
 
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/provision') && $request['database'] === 'existing' && $request['queue'] === 'sqs');
@@ -145,16 +145,16 @@ test('where the region has neither, Scaleway Queues is left out and without a da
             'scaleway:database:rdb-1', 'Existing: main (Managed Database)', 'none', 'No database',
         ])
         ->expectsChoice('Where should the jobs of production wait?', 'database', [
-            'database', 'In the database: the worker is called every minute and never sleeps, which costs more at Scaleway', 'none', 'No queue: a job runs during the request',
+            'database', 'In the database: the worker never sleeps (costs more)', 'none', 'No queue: a job runs during the request',
         ])
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('A private bucket for the files of production?', 'no')
         ->assertSuccessful();
 
     // Nothing to choose from but "No database", and then nothing left for the jobs but no queue.
     $this->artisan('provision', ['environment' => 'production'])
         ->expectsChoice('Which database should production use?', 'none', ['none', 'No database'])
         ->doesntExpectOutputToContain('Where should the jobs of production wait?')
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('A private bucket for the files of production?', 'no')
         ->assertSuccessful();
 
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/provision') && $request['database'] === 'none' && $request['queue'] === 'none');
@@ -170,12 +170,12 @@ test('a control plane that says nothing about the region offers everything', fun
     $this->artisan('provision', ['environment' => 'production'])
         ->doesntExpectOutputToContain('Scaleway does not offer')
         ->expectsChoice('Which database should production use?', 'new', [
-            'new', 'A new Serverless SQL Database, which sleeps while nobody uses it', 'none', 'No database',
+            'new', 'A new Serverless SQL Database (sleeps when idle)', 'none', 'No database',
         ])
         ->expectsChoice('Where should the jobs of production wait?', 'sqs', [
-            'sqs', 'A queue at Scaleway Queues (SQS): the worker sleeps while there is nothing to do', 'database', 'In the database: the worker is called every minute and never sleeps, which costs more at Scaleway', 'none', 'No queue: a job runs during the request',
+            'sqs', 'Scaleway Queues (SQS): the worker sleeps when idle', 'database', 'In the database: the worker never sleeps (costs more)', 'none', 'No queue: a job runs during the request',
         ])
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('A private bucket for the files of production?', 'no')
         ->assertSuccessful();
 });
 

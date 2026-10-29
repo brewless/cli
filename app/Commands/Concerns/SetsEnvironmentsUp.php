@@ -9,6 +9,7 @@ use App\Support\ApiException;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\Console\Terminal;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
@@ -23,6 +24,25 @@ use function Laravel\Prompts\select;
  */
 trait SetsEnvironmentsUp
 {
+    /**
+     * Explanation above a question, wrapped to the terminal. Laravel Prompts
+     * cuts a choice or a hint off at the width of the terminal; these lines
+     * run on instead, so a choice itself can stay short.
+     *
+     * @param  list<string>  $paragraphs
+     */
+    protected function explain(array $paragraphs): void
+    {
+        $width = max(40, (new Terminal)->getWidth() - 4);
+        $this->newLine();
+
+        foreach ($paragraphs as $paragraph) {
+            foreach (explode("\n", wordwrap($paragraph, $width, "\n", true)) as $line) {
+                $this->line('  <fg=gray>'.$line.'</>');
+            }
+        }
+    }
+
     private const array DATABASES = ['new', 'existing', 'none'];
 
     private const array QUEUES = ['database', 'sqs', 'none'];
@@ -135,13 +155,13 @@ trait SetsEnvironmentsUp
         $options = [];
 
         if ($offers['serverless_database'] === true) {
-            $options['new'] = 'A new Serverless SQL Database, which sleeps while nobody uses it';
+            $options['new'] = 'A new Serverless SQL Database (sleeps when idle)';
         } else {
             $this->line('  Scaleway does not offer Serverless SQL Database in '.$region.'.');
         }
 
         foreach ($existing as $key => $database) {
-            $options[$key] = 'Existing: '.$database['name'].' ('.(($database['kind'] ?? '') === 'database' ? 'Managed Database' : 'Serverless SQL Database').(($database['in_use'] ?? false) === true ? ', used by another environment' : '').')';
+            $options[$key] = 'Existing: '.$database['name'].' ('.(($database['kind'] ?? '') === 'database' ? 'Managed Database' : 'Serverless SQL Database').(($database['in_use'] ?? false) === true ? ', in use elsewhere' : '').')';
         }
 
         $options['none'] = 'No database';
@@ -150,13 +170,14 @@ trait SetsEnvironmentsUp
 
         // Scaleway Queues first: a job wakes the worker, which sleeps in between. The database is offered
         // with what it costs: the worker is called every minute to look for jobs, and never sleeps.
-        $queues = ($offers['queue'] === true ? ['sqs' => 'A queue at Scaleway Queues (SQS): the worker sleeps while there is nothing to do'] : [])
-            + ($database === 'none' ? [] : ['database' => 'In the database: the worker is called every minute and never sleeps, which costs more at Scaleway'])
+        $queues = ($offers['queue'] === true ? ['sqs' => 'Scaleway Queues (SQS): the worker sleeps when idle'] : [])
+            + ($database === 'none' ? [] : ['database' => 'In the database: the worker never sleeps (costs more)'])
             + ['none' => 'No queue: a job runs during the request'];
 
         // With no database and no Scaleway Queues there is nothing left to choose.
         $queue = count($queues) === 1 ? 'none' : (string) select(label: 'Where should the jobs of '.$name.' wait?', options: $queues, default: array_key_first($queues));
-        $bucket = confirm('A private bucket at Scaleway Object Storage for the files of '.$name.'? A container keeps no files of its own.');
+        $this->explain(['A container keeps no files of its own: uploads go into a private bucket at Scaleway Object Storage.']);
+        $bucket = confirm('A private bucket for the files of '.$name.'?');
 
         return [
             'database' => isset($existing[$database]) ? 'existing' : $database,

@@ -87,7 +87,7 @@ test('init adds production and staging, asks what they should have and sets them
         ->expectsQuestion('Which mailer should production send with?', 'scaleway')
         ->expectsQuestion('Which database should production use?', 'new')
         ->expectsQuestion('Where should the jobs of production wait?', 'sqs')
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'yes')
+        ->expectsConfirmation('A private bucket for the files of production?', 'yes')
         ->expectsConfirmation('Set staging up the same way (database: a new one, queue: Scaleway Queues, bucket: yes)?', 'yes')
         ->expectsOutputToContain('Added production and staging in Amsterdam.')
         ->expectsConfirmation('Make this now?', 'yes')
@@ -112,7 +112,7 @@ test('saying no at the end makes nothing and says how to do it later', function 
         ->expectsQuestion('Which mailer should production send with?', 'scaleway')
         ->expectsQuestion('Which database should production use?', 'none')
         ->expectsQuestion('Where should the jobs of production wait?', 'none')
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('A private bucket for the files of production?', 'no')
         ->expectsConfirmation('Make this now?', 'no')
         ->expectsOutputToContain('Later: brewless provision production --database=none --queue=none')
         ->expectsOutputToContain('Next: brewless provision production')
@@ -209,11 +209,11 @@ test('the same way is not offered when the next environment\'s region cannot mak
         ->expectsQuestion('Which mailer should production send with?', 'scaleway')
         ->expectsQuestion('Which database should production use?', 'new')
         ->expectsQuestion('Where should the jobs of production wait?', 'database')
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of production? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('A private bucket for the files of production?', 'no')
         ->doesntExpectOutputToContain('Set staging up the same way')
         ->expectsChoice('Which database should staging use?', 'none', ['none', 'No database'])
         ->expectsQuestion('Where should the jobs of staging wait?', 'none')
-        ->expectsConfirmation('A private bucket at Scaleway Object Storage for the files of staging? A container keeps no files of its own.', 'no')
+        ->expectsConfirmation('A private bucket for the files of staging?', 'no')
         ->expectsConfirmation('Make this now?', 'no')
         ->assertSuccessful();
 });
@@ -563,6 +563,8 @@ test('init asks a Laravel application how long the edge may keep public pages, o
     laravelShop($this, 'v0.17.1');
 
     $this->artisan('init', ['--application' => 'shop', '--environments' => 'production,staging', '--region' => 'fr-par', '--mail' => 'scaleway', '--database' => 'none', '--queue' => 'none'])
+        // What each choice means stands above the question, wrapped: Laravel Prompts cuts a choice off at the terminal's width.
+        ->expectsOutputToContain('every deploy empties the edge')
         ->expectsQuestion('May the edge keep public pages, and for how long?', '1d')
         ->expectsOutputToContain('brewless.yml lets the edge keep the public pages of production and staging for 1d.')
         ->expectsOutputToContain('composer require brewless/laravel:^0.18')

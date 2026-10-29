@@ -208,7 +208,7 @@ final class InitCommand extends Command
                 label: 'Which environments should it have?',
                 options: $options,
                 default: $suggested,
-                hint: $existing === [] ? 'Space to pick, enter to go on. None is fine: add them later in the console.' : 'It has already: '.implode(', ', $existing).'.',
+                hint: $existing === [] ? 'Space picks, enter goes on. None is fine.' : 'It has already: '.implode(', ', $existing).'.',
             );
         }
 
@@ -257,12 +257,16 @@ final class InitCommand extends Command
             return [];
         }
 
+        if ($this->option('mail') === null && $this->input->isInteractive()) {
+            $this->explain(['Scaleway Transactional Email sends from your own Scaleway project. None keeps the MAIL_MAILER your application has.']);
+        }
+
         $choice = $this->option('mail') ?? ($this->input->isInteractive() ? select(
             label: 'Which mailer should '.implode(' and ', $production).' send with?',
             options: [
-                'scaleway' => 'Scaleway Transactional Email, in your Scaleway project (the default)',
+                'scaleway' => 'Scaleway Transactional Email (default)',
                 'lettermint' => 'Lettermint, with your own account',
-                'none' => 'None: keep the MAIL_MAILER of the application',
+                'none' => 'None: keep MAIL_MAILER',
             ],
             default: 'scaleway',
         ) : 'scaleway');
@@ -293,15 +297,22 @@ final class InitCommand extends Command
             return [];
         }
 
+        if (! is_string($given) && $this->input->isInteractive()) {
+            $this->explain([
+                'The edge keeps only pages that are the same for every visitor: no session, no cookie, nobody signed in.',
+                '1 hour: every deploy empties the edge, so a page is at most an hour old between deploys.',
+                '1 day: the container sleeps most; a page from the database can be a day old.',
+            ]);
+        }
+
         $choice = is_string($given) ? $given : ($this->input->isInteractive() ? (string) select(
             label: 'May the edge keep public pages, and for how long?',
             options: [
-                '1h' => '1 hour (recommended): every deploy empties the edge, so a page is at most an hour old between deploys',
-                '1d' => '1 day: the container sleeps most, a page from the database can be a day old',
+                '1h' => '1 hour (recommended)',
+                '1d' => '1 day',
                 'none' => 'Not at all',
             ],
             default: '1h',
-            hint: 'Only pages that are the same for every visitor: no session, no cookie, nobody signed in.',
         ) : '1h');
 
         return array_fill_keys($environments, self::cacheTime($choice === 'none' ? '0' : $choice));
@@ -553,10 +564,11 @@ final class InitCommand extends Command
         }
 
         if ($shareable !== []) {
+            $this->explain(['Applications in one project can share a database, a cache and a mail domain; apart, each shows on its own in Scaleway.']);
+
             $choice = select(
                 label: 'Which Scaleway project does it run in?',
                 options: ['own' => 'A project of its own', ...array_map(static fn (array $candidate): string => 'Share the project of '.$candidate['name'], $shareable)],
-                hint: 'Applications in one project can share a database, a cache and a mail domain; apart, each shows on its own in Scaleway.',
             );
 
             if ($choice !== 'own') {
@@ -564,7 +576,7 @@ final class InitCommand extends Command
             }
         }
 
-        $name = text(label: 'Name of its Scaleway project', placeholder: 'empty: named after the application', hint: 'Lowercase letters, digits and dashes, such as websites when more applications will share it.');
+        $name = text(label: 'Name of its Scaleway project', placeholder: 'empty: named after the application', hint: 'Lowercase letters, digits and dashes, such as websites.');
 
         return $name === '' ? [] : ['project_name' => $name];
     }
