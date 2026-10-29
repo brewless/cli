@@ -669,3 +669,60 @@ test('a scaleway project that could not be made does not stop init', function ()
         ->expectsOutputToContain('Wrote brewless.yml')
         ->assertSuccessful();
 });
+
+/**
+ * An organisation whose key may make projects, with Shop in a project of its own.
+ */
+function organisationKey(): void
+{
+    Http::fake([
+        '*/cli/api/applications' => fn (Request $request) => $request->method() === 'POST'
+            ? Http::response(['data' => ['id' => 'app9', 'slug' => 'blog', 'environments' => []]], 201)
+            : Http::response([
+                ...applications(),
+                'options' => [
+                    'projects' => [['id' => 'key1', 'name' => 'Acme', 'makes_projects' => true]],
+                    'shareable' => [['id' => 'app1', 'name' => 'Shop', 'project_id' => 'proj-shop', 'provider_connection_id' => 'key1']],
+                ],
+            ]),
+    ]);
+}
+
+test('a new application can share the scaleway project of another, to share its database', function (): void {
+    signedIn('acme');
+    organisationKey();
+
+    $this->artisan('init', ['--name' => 'Blog', '--environments' => 'none'])
+        ->expectsChoice('Which Scaleway project does it run in?', 'app1', ['own' => 'A project of its own', 'app1' => 'Share the project of Shop'])
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && ($request->data()['share_project_with'] ?? null) === 'app1' && ! isset($request['project_name']));
+});
+
+test('a project of its own can be named, by a question or by an option, and a script names what to share', function (): void {
+    signedIn('acme');
+    organisationKey();
+
+    $this->artisan('init', ['--name' => 'Blog', '--environments' => 'none'])
+        ->expectsChoice('Which Scaleway project does it run in?', 'own', ['own' => 'A project of its own', 'app1' => 'Share the project of Shop'])
+        ->expectsQuestion('Name of its Scaleway project', 'websites')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && ($request->data()['project_name'] ?? null) === 'websites');
+
+    $this->artisan('init', ['--name' => 'Blog', '--environments' => 'none', '--share-project' => 'shop', '--no-interaction' => true, '--force' => true])->assertSuccessful();
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && ($request->data()['share_project_with'] ?? null) === 'app1');
+
+    $this->artisan('init', ['--name' => 'Blog', '--environments' => 'none', '--share-project' => 'nope', '--no-interaction' => true, '--force' => true])
+        ->expectsOutputToContain('No application "nope" has a Scaleway project of its own to share. These do: shop.')
+        ->assertFailed();
+});
+
+test('a key that may not make projects asks nothing about them', function (): void {
+    signedIn('acme');
+    freshOrganisation();
+
+    $this->artisan('init', ['--name' => 'PrivaSearch', '--environments' => 'none'])->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && str_ends_with($request->url(), '/cli/api/applications') && ! isset($request['project_name']) && ! isset($request['share_project_with']));
+});

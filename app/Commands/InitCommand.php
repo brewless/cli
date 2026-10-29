@@ -36,6 +36,8 @@ final class InitCommand extends Command
         {--application= : The slug of an application that exists already}
         {--name= : The name of a new application to create}
         {--project= : For a new application, with several Scaleway projects connected: the name or ID of the one it runs in}
+        {--share-project= : For a new application, when the key may make projects: the slug of an application whose Scaleway project it shares, to share a database, cache or mail domain}
+        {--project-name= : For a new application, when the key may make projects: the name of its Scaleway project of its own, such as websites}
         {--framework= : laravel, symfony or generic; detected from composer.json when left out}
         {--php= : The PHP version to build for, such as 8.4; left out, Brewless builds for its default}
         {--environments= : The environments to add, such as production,staging; "none" adds none}
@@ -92,7 +94,8 @@ final class InitCommand extends Command
                     ? $newName
                     : text(label: 'What is the application called?', default: basename($directory), required: true);
                 $project = $this->project($listing['options']['projects'] ?? []);
-                $application = $api->post('/api/applications', ['name' => $name, 'framework' => $framework, ...($project === null ? [] : ['provider_connection_id' => $project])])['data'] ?? [];
+                $placement = $this->placement($listing, $applications, $project);
+                $application = $api->post('/api/applications', ['name' => $name, 'framework' => $framework, ...($project === null ? [] : ['provider_connection_id' => $project]), ...$placement])['data'] ?? [];
                 $slug = (string) ($application['slug'] ?? '');
 
                 $this->components->info('Created the application '.$slug.'.');
@@ -497,6 +500,73 @@ final class InitCommand extends Command
         }
 
         $this->newLine();
+    }
+
+    /**
+     * Where the Scaleway project of a new application comes from, when its key
+     * may make projects: one of its own, named or after the application, or
+     * the project of another application, so the two can share a database, a
+     * cache or a mail domain.
+     *
+     * @param  array<array-key, mixed>  $listing
+     * @param  array<array-key, mixed>  $applications
+     * @return array{share_project_with?: string, project_name?: string}
+     */
+    private function placement(array $listing, array $applications, ?string $connection): array
+    {
+        $options = is_array($listing['options'] ?? null) ? $listing['options'] : [];
+        $keys = array_values(array_filter(is_array($options['projects'] ?? null) ? $options['projects'] : [], is_array(...)));
+        $key = $connection === null ? ($keys[0] ?? null) : array_find($keys, static fn (array $candidate): bool => ($candidate['id'] ?? null) === $connection);
+
+        if (! is_array($key) || ($key['makes_projects'] ?? false) !== true) {
+            return [];
+        }
+
+        $shareable = [];
+
+        foreach (is_array($options['shareable'] ?? null) ? $options['shareable'] : [] as $candidate) {
+            if (is_array($candidate) && ($candidate['provider_connection_id'] ?? null) === $key['id'] && is_string($candidate['id'] ?? null)) {
+                $slug = array_find($applications, static fn (mixed $application): bool => is_array($application) && ($application['id'] ?? null) === $candidate['id'])['slug'] ?? null;
+                $shareable[$candidate['id']] = ['name' => (string) ($candidate['name'] ?? ''), 'slug' => is_string($slug) ? $slug : ''];
+            }
+        }
+
+        $share = $this->option('share-project');
+        $name = $this->option('project-name');
+
+        if (is_string($share) && $share !== '') {
+            foreach ($shareable as $id => $candidate) {
+                if ($candidate['slug'] === $share || strcasecmp($candidate['name'], $share) === 0) {
+                    return ['share_project_with' => $id];
+                }
+            }
+
+            throw new RuntimeException('No application "'.$share.'" has a Scaleway project of its own to share.'.($shareable === [] ? '' : ' These do: '.implode(', ', array_filter(array_column($shareable, 'slug'))).'.'));
+        }
+
+        if (is_string($name) && $name !== '') {
+            return ['project_name' => $name];
+        }
+
+        if (! $this->input->isInteractive()) {
+            return [];
+        }
+
+        if ($shareable !== []) {
+            $choice = select(
+                label: 'Which Scaleway project does it run in?',
+                options: ['own' => 'A project of its own', ...array_map(static fn (array $candidate): string => 'Share the project of '.$candidate['name'], $shareable)],
+                hint: 'Applications in one project can share a database, a cache and a mail domain; apart, each shows on its own in Scaleway.',
+            );
+
+            if ($choice !== 'own') {
+                return ['share_project_with' => (string) $choice];
+            }
+        }
+
+        $name = text(label: 'Name of its Scaleway project', placeholder: 'empty: named after the application', hint: 'Lowercase letters, digits and dashes, such as websites when more applications will share it.');
+
+        return $name === '' ? [] : ['project_name' => $name];
     }
 
     /**
