@@ -486,7 +486,7 @@ final class InitCommand extends Command
         }
 
         if (array_any($environments, static fn (string $name): bool => $vapor->environments[$name]['database'] ?? false)) {
-            $this->line('  - the data in your databases: the new ones are empty');
+            $this->line('  - the data in your databases: brewless db:import <environment> mysql://<user>@<host>/<database> (or postgres://…)');
         }
 
         if (array_any($environments, static fn (string $name): bool => $vapor->environments[$name]['bucket'] ?? false)) {
