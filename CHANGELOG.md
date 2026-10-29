@@ -4,6 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.21.0 (2026-10-29)
+
+- `db:import <environment> [postgres|mysql://<user>@<host>[:<port>]/<database>]` copies a PostgreSQL or MySQL database into the environment's database; MySQL into PostgreSQL is converted with pgloader. The password comes from `SOURCE_DB_PASSWORD`, `--from-env` (the `DB_*` lines of an old `.env`) or a prompt, never from the command line. It changes nothing at the source and refuses a destination with tables unless `--replace` is given (on production you type its name). By default the copy runs in your Scaleway project; `--local` runs it in Docker on this machine (BL-205).
+- `db:import-status <environment>` shows the last copy into an environment's database (BL-205).
+
 ## 0.20.0 (2026-10-29)
 
 - A domain whose DNS you keep at a provider of your own no longer makes `domain:add` wait for its certificate: it ends with the record to make there, and Brewless looks it up and issues the certificate by itself (BL-201). On the domain itself, such as `example.eu`, it names the ways around a `CNAME` (BL-204).
