@@ -11,6 +11,7 @@ use App\Support\Credentials;
 use App\Support\Framework;
 use App\Support\Project;
 use App\Support\Vapor;
+use Illuminate\Support\Sleep;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
 
@@ -95,6 +96,7 @@ final class InitCommand extends Command
                 $slug = (string) ($application['slug'] ?? '');
 
                 $this->components->info('Created the application '.$slug.'.');
+                $this->awaitProject($api, $application);
             } else {
                 $application = array_find($applications, static fn (array $candidate): bool => ($candidate['slug'] ?? null) === $slug)
                     ?? throw new RuntimeException('The organisation '.$organisation.' has no application "'.$slug.'".');
@@ -495,6 +497,47 @@ final class InitCommand extends Command
         }
 
         $this->newLine();
+    }
+
+    /**
+     * A key that may make projects gives a new application a Scaleway project
+     * of its own: wait for it and say which. Init goes on either way; when it
+     * did not work, setting the first environment up makes it.
+     *
+     * @param  array<string, mixed>  $application
+     */
+    private function awaitProject(Api $api, array $application): void
+    {
+        $operation = is_array($application['project_operation'] ?? null) ? $application['project_operation'] : null;
+
+        if ($operation === null || ! is_string($operation['id'] ?? null)) {
+            return;
+        }
+
+        $this->line('  Making its Scaleway project…');
+
+        for ($look = 0; $look < 60 && in_array($operation['status'] ?? '', ['queued', 'running'], true); $look++) {
+            Sleep::for(2)->seconds();
+
+            $operation = $api->get('/api/operations/'.$operation['id'])['data'] ?? $operation;
+        }
+
+        $result = is_array($operation['result'] ?? null) ? $operation['result'] : [];
+
+        if (($operation['status'] ?? '') === 'succeeded' && is_string($result['project_id'] ?? null)) {
+            $name = is_string($result['project_name'] ?? null) ? $result['project_name'] : $result['project_id'];
+            $this->components->info('Made the Scaleway project '.$name.': everything of this application runs there.');
+
+            return;
+        }
+
+        $this->components->warn('Its Scaleway project is not made yet.');
+
+        if (is_string($operation['error_message'] ?? null)) {
+            $this->line('  '.$operation['error_message']);
+        }
+
+        $this->line('  Setting up its first environment tries again.');
     }
 
     /**

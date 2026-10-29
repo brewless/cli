@@ -6,6 +6,7 @@ use App\Support\Project;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Symfony\Component\Yaml\Yaml;
 
 test('init connects the project to an application that exists', function (): void {
@@ -625,4 +626,46 @@ test('another framework is not asked about the edge, unless --edge-cache names i
     $this->artisan('init', ['--application' => 'shop', '--environments' => 'production', '--region' => 'fr-par', '--mail' => 'scaleway', '--edge-cache' => '1h', '--no-interaction' => true, '--force' => true])->assertSuccessful();
 
     expect(Yaml::parseFile($this->project.'/brewless.yml')['environments']['production']['edge'])->toBe(['cache' => '1h']);
+});
+
+test('a new application of a key that may make projects waits for its scaleway project and names it', function (): void {
+    Sleep::fake();
+    signedIn('acme');
+    $looks = 0;
+    Http::fake([
+        '*/cli/api/applications' => fn (Request $request) => $request->method() === 'POST'
+            ? Http::response(['data' => ['id' => 'app9', 'slug' => 'shop', 'environments' => [], 'project_operation' => ['id' => 'op-p', 'status' => 'queued', 'error_message' => null]]], 201)
+            : Http::response(['data' => []]),
+        '*/cli/api/operations/op-p' => function () use (&$looks) {
+            $looks++;
+
+            return Http::response(['data' => $looks < 2
+                ? ['id' => 'op-p', 'status' => 'running']
+                : ['id' => 'op-p', 'status' => 'succeeded', 'result' => ['project_id' => '9e9e9e9e-0000-4000-8000-0000000000e9', 'project_name' => 'shop']]]);
+        },
+    ]);
+
+    $this->artisan('init', ['--name' => 'Shop', '--environments' => 'none', '--no-interaction' => true])
+        ->expectsOutputToContain('Making its Scaleway project')
+        ->expectsOutputToContain('Made the Scaleway project shop')
+        ->assertSuccessful();
+
+    expect($looks)->toBe(2);
+});
+
+test('a scaleway project that could not be made does not stop init', function (): void {
+    Sleep::fake();
+    signedIn('acme');
+    Http::fake([
+        '*/cli/api/applications' => fn (Request $request) => $request->method() === 'POST'
+            ? Http::response(['data' => ['id' => 'app9', 'slug' => 'shop', 'environments' => [], 'project_operation' => ['id' => 'op-p', 'status' => 'queued', 'error_message' => null]]], 201)
+            : Http::response(['data' => []]),
+        '*/cli/api/operations/op-p' => Http::response(['data' => ['id' => 'op-p', 'status' => 'failed', 'error_message' => 'Scaleway refuses every name.']]),
+    ]);
+
+    $this->artisan('init', ['--name' => 'Shop', '--environments' => 'none', '--no-interaction' => true])
+        ->expectsOutputToContain('Scaleway refuses every name.')
+        ->expectsOutputToContain('Setting up its first environment tries again.')
+        ->expectsOutputToContain('Wrote brewless.yml')
+        ->assertSuccessful();
 });
