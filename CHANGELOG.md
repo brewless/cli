@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.21.1 (2026-10-29)
+
+- The choices of `init` and `provision` fit the terminal again: they are short, and what they mean stands above the question, wrapped, instead of being cut off ("a page is at most…").
+
 ## 0.21.0 (2026-10-29)
 
 - `db:import <environment> [postgres|mysql://<user>@<host>[:<port>]/<database>]` copies a PostgreSQL or MySQL database into the environment's database; MySQL into PostgreSQL is converted with pgloader. The password comes from `SOURCE_DB_PASSWORD`, `--from-env` (the `DB_*` lines of an old `.env`) or a prompt, never from the command line. It changes nothing at the source and refuses a destination with tables unless `--replace` is given (on production you type its name). By default the copy runs in your Scaleway project; `--local` runs it in Docker on this machine (BL-205).
