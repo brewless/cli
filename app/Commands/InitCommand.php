@@ -490,7 +490,7 @@ final class InitCommand extends Command
         }
 
         if (array_any($environments, static fn (string $name): bool => $vapor->environments[$name]['bucket'] ?? false)) {
-            $this->line('  - the files in your S3 buckets');
+            $this->line('  - the files in your S3 buckets: brewless storage:import <environment> s3://<bucket>');
         }
 
         foreach ($environments as $name) {
