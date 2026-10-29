@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.22.0 (2026-10-29)
 
 - `db:import <environment> --file=<dump>` copies a dump `pg_dump` wrote on this machine into the environment's database: plain SQL, the same gzipped, or `pg_dump`'s own format (`-Fc`, `-Ft`), read with `pg_restore`. It always copies from here, in Docker, as `--local` does, because a job in your project cannot reach a file on your machine; the destination has to be PostgreSQL. It is one transaction, so a dump that stops halfway leaves the database as it was, and the audit trail notes the name of the dump, never its path. Lines of a dump made with `pg_dump --create` that name a database of its own are left out (BL-207).
 
