@@ -29,7 +29,7 @@ final class DbImportCommand extends Command
         'routines_need_trust' => 'The source has triggers or routines, and the destination only takes those from a user with SUPER while its binary log is on. Set log_bin_trust_function_creators to 1 in the settings of the Managed Database, then copy again. Nothing was written.',
         'source_authentication' => 'pgloader could not sign in to the source: the server asks for a way of signing in it does not know. Give the copy a user with mysql_native_password. Nothing was written.',
         'client_too_old' => 'The source runs a PostgreSQL newer than the pg_dump of the builder image. Nothing was written.',
-        'tool_missing' => 'The builder image lacks a tool the copy needs. Update brewless/cli and try again. Nothing was written.',
+        'tool_missing' => 'The builder image lacks :tool, which the copy needs. Copy without --local, or try again once Brewless pins a newer builder image. Nothing was written.',
     ];
 
     protected $signature = 'db:import {environment : The environment whose database the data goes into}
@@ -369,7 +369,7 @@ final class DbImportCommand extends Command
         $reason = is_string($outcome['reason'] ?? null) ? $outcome['reason'] : '';
 
         if ($kind === 'refused' && isset(self::REFUSALS[$reason])) {
-            $this->components->error(strtr(self::REFUSALS[$reason], [':environment' => $slug, ':tables' => number_format((int) ($outcome['destination_tables'] ?? 0))]));
+            $this->components->error(strtr(self::REFUSALS[$reason], [':environment' => $slug, ':tables' => number_format((int) ($outcome['destination_tables'] ?? 0)), ':tool' => is_string($outcome['tool'] ?? null) ? $outcome['tool'] : 'a tool']));
 
             return self::FAILURE;
         }
