@@ -8,6 +8,7 @@ use App\Commands\Concerns\FollowsImports;
 use App\Commands\Concerns\TalksToBrewless;
 use App\Support\Api;
 use App\Support\SourceDatabase;
+use App\Support\SourceDump;
 use App\Support\Vapor;
 use Dotenv\Dotenv;
 use Illuminate\Support\Facades\Process;
@@ -23,17 +24,26 @@ final class DbImportCommand extends Command
     use FollowsImports;
     use TalksToBrewless;
 
+    /** What the script calls a copy from a dump file. */
+    private const string FROM_FILE = 'pgfile';
+
+    /** Where the dump is given to the container to read, and nothing else of this machine. */
+    private const string DUMP = '/dump';
+
     /** What the script says when it refuses, before it wrote anything. */
     private const array REFUSALS = [
         'destination_not_empty' => 'The database of :environment holds :tables tables already, so nothing was copied. Copy again with --replace to remove what it holds first.',
         'routines_need_trust' => 'The source has triggers or routines, and the destination only takes those from a user with SUPER while its binary log is on. Set log_bin_trust_function_creators to 1 in the settings of the Managed Database, then copy again. Nothing was written.',
         'source_authentication' => 'pgloader could not sign in to the source: the server asks for a way of signing in it does not know. Give the copy a user with mysql_native_password. Nothing was written.',
-        'client_too_old' => 'The source runs a PostgreSQL newer than the pg_dump of the builder image. Nothing was written.',
+        'client_too_old' => 'The data comes from a PostgreSQL :source_version, newer than the client tools of the builder image (:client_version), so it cannot be read. Nothing was written.',
         'tool_missing' => 'The builder image lacks :tool, which the copy needs. Copy without --local, or try again once Brewless pins a newer builder image. Nothing was written.',
+        'dump_file_missing' => 'The dump file could not be read in the container. Is it still there?',
+        'dump_file_empty' => 'The dump file is empty, so there was nothing to copy.',
     ];
 
     protected $signature = 'db:import {environment : The environment whose database the data goes into}
         {source? : The database to copy from, as postgres://<user>@<host>[:<port>]/<database> or mysql://…, without a password}
+        {--file= : Copy from a pg_dump file on this machine; always copied from here, in Docker}
         {--from-env= : Read the source\'s DB_* values from this .env file of the old application}
         {--replace : Remove what the destination holds first}
         {--local : Copy from this machine, in Docker, instead of a job in your Scaleway project}
@@ -41,7 +51,7 @@ final class DbImportCommand extends Command
         {--no-follow : Start the copy in your project and return}
         {--force : Do not ask for confirmation}';
 
-    protected $description = 'Copy a PostgreSQL or MySQL database into an environment\'s database';
+    protected $description = 'Copy a PostgreSQL or MySQL database, or a pg_dump file, into an environment\'s database';
 
     /**
      * @return array{status: string, deleted: string, cancelled: string}
@@ -63,22 +73,33 @@ final class DbImportCommand extends Command
             $slug = (string) $this->argument('environment');
             ['environment' => $environment] = $this->environment($api, $project, $slug);
 
-            $source = $this->withPassword(SourceDatabase::gather($this->argument('source'), $this->option('from-env')));
-            $source->check();
-
-            $local = (bool) $this->option('local');
+            $file = $this->option('file');
             $dryRun = (bool) $this->option('dry-run');
             $replace = (bool) $this->option('replace');
+            // A dump on this machine is read here: a job in your project has no way to a file on your laptop.
+            $local = (bool) $this->option('local') || is_string($file);
 
-            if (! $local && $source->isPrivate()) {
-                throw new RuntimeException($source->host.' is this machine or a private network, which a job in your Scaleway project cannot reach. Copy from here with --local.');
+            if (is_string($file) && ($this->argument('source') !== null || $this->option('from-env') !== null)) {
+                throw new RuntimeException('A copy from a dump file has no source database: give --file, or the address of a database, not both.');
+            }
+
+            $source = is_string($file)
+                ? SourceDump::at($file)
+                : $this->withPassword(SourceDatabase::gather($this->argument('source'), $this->option('from-env')));
+
+            if ($source instanceof SourceDatabase) {
+                $source->check();
+
+                if (! $local && $source->isPrivate()) {
+                    throw new RuntimeException($source->host.' is this machine or a private network, which a job in your Scaleway project cannot reach. Copy from here with --local.');
+                }
             }
 
             $this->newLine();
-            $this->line('  From  <options=bold>'.$source->location().'</> ('.$source->name().')');
+            $this->line('  From  <options=bold>'.$source->location().'</> ('.($source instanceof SourceDump ? $this->size($source->bytes).' on this machine' : $source->name()).')');
             $this->line('  Into  the database of <options=bold>'.$slug.'</>'.($local ? ', from this machine in Docker' : ', by a job in your Scaleway project'));
 
-            if ($source->passwordFrom !== null) {
+            if ($source instanceof SourceDatabase && $source->passwordFrom !== null) {
                 $this->line('  Password from '.$source->passwordFrom);
             }
 
@@ -90,9 +111,11 @@ final class DbImportCommand extends Command
                 return self::SUCCESS;
             }
 
-            return $local
-                ? $this->copyHere($api, $environment, $slug, $source, $replace, $dryRun)
-                : $this->copyInProject($api, $environment, $slug, $source, $replace, $dryRun);
+            if ($source instanceof SourceDump || $local) {
+                return $this->copyHere($api, $environment, $slug, $source, $replace, $dryRun);
+            }
+
+            return $this->copyInProject($api, $environment, $slug, $source, $replace, $dryRun);
         });
     }
 
@@ -186,11 +209,12 @@ final class DbImportCommand extends Command
     /**
      * Run the same script as the job, in the same image, with Docker on this
      * machine. The passwords stay here; only the start and the totals are
-     * written to the audit trail.
+     * written to the audit trail. A dump file is given to the container to
+     * read, at :DUMP, and goes no further.
      *
      * @param  array<string, mixed>  $environment
      */
-    private function copyHere(Api $api, array $environment, string $slug, SourceDatabase $source, bool $replace, bool $dryRun): int
+    private function copyHere(Api $api, array $environment, string $slug, SourceDatabase|SourceDump $source, bool $replace, bool $dryRun): int
     {
         if (Process::run(['docker', 'version', '--format', '{{.Server.Version}}'])->failed()) {
             throw new RuntimeException('--local copies with Docker on this machine, and Docker does not answer. Start Docker and try again.');
@@ -205,7 +229,12 @@ final class DbImportCommand extends Command
         }
 
         $destination = $this->destination($api, $environment, $slug);
-        $method = match ([$source->engine, $destination['engine']]) {
+
+        if ($source instanceof SourceDump && $destination['engine'] !== SourceDatabase::POSTGRES) {
+            throw new RuntimeException('A dump pg_dump wrote goes into a PostgreSQL database, and the database of '.$slug.' is MySQL.');
+        }
+
+        $method = $source instanceof SourceDump ? self::FROM_FILE : match ([$source->engine, $destination['engine']]) {
             [SourceDatabase::POSTGRES, SourceDatabase::POSTGRES] => 'pg',
             [SourceDatabase::MYSQL, SourceDatabase::MYSQL] => 'mysql',
             [SourceDatabase::MYSQL, SourceDatabase::POSTGRES] => 'pgloader',
@@ -213,29 +242,35 @@ final class DbImportCommand extends Command
         };
 
         $linux = PHP_OS_FAMILY === 'Linux';
-        // A tunnel on this machine is reached from Docker Desktop's containers at host.docker.internal.
-        $sourceHost = $source->isThisMachine() && ! $linux ? 'host.docker.internal' : $source->host;
         $destinationHost = in_array($destination['host'], ['localhost', '127.0.0.1', '::1'], true) && ! $linux ? 'host.docker.internal' : $destination['host'];
 
         $variables = [
             'IMPORT_METHOD' => $method,
             'IMPORT_REPLACE' => $replace ? '1' : '0',
             'IMPORT_DRY_RUN' => $dryRun ? '1' : '0',
-            'SOURCE_HOST' => $sourceHost,
-            'SOURCE_PORT' => (string) $source->port,
-            'SOURCE_DATABASE' => $source->database,
-            'SOURCE_USER' => $source->username,
-            'SOURCE_SSLMODE' => $source->sslmode,
+            ...$source instanceof SourceDump ? ['SOURCE_FILE' => self::DUMP.'/'.$source->name()] : [
+                // A tunnel on this machine is reached from Docker Desktop's containers at host.docker.internal.
+                'SOURCE_HOST' => $source->isThisMachine() && ! $linux ? 'host.docker.internal' : $source->host,
+                'SOURCE_PORT' => (string) $source->port,
+                'SOURCE_DATABASE' => $source->database,
+                'SOURCE_USER' => $source->username,
+                'SOURCE_SSLMODE' => $source->sslmode,
+            ],
             'DESTINATION_HOST' => $destinationHost,
             'DESTINATION_PORT' => (string) $destination['port'],
             'DESTINATION_DATABASE' => $destination['database'],
             'DESTINATION_USER' => $destination['username'],
             'DESTINATION_SSLMODE' => $destination['sslmode'],
-            'IMPORT_CONFIG' => (string) json_encode(['source_password' => $source->password, 'destination_password' => $destination['password']], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'IMPORT_CONFIG' => (string) json_encode([
+                ...$source instanceof SourceDump ? [] : ['source_password' => $source->password],
+                'destination_password' => $destination['password'],
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         ];
 
-        // The values go through Docker's own environment, by name only: never on a command line.
-        $command = ['docker', 'run', '--rm', '--platform', 'linux/amd64', ...($linux ? ['--network', 'host'] : [])];
+        // The values go through Docker's own environment, by name only: never on a command line. The dump
+        // is the one file of this machine the container sees, and it may only read it.
+        $command = ['docker', 'run', '--rm', '--platform', 'linux/amd64', ...($linux ? ['--network', 'host'] : []),
+            ...$source instanceof SourceDump ? ['-v', $source->path.':'.self::DUMP.'/'.$source->name().':ro'] : []];
 
         foreach (array_keys($variables) as $name) {
             $command[] = '-e';
@@ -356,11 +391,15 @@ final class DbImportCommand extends Command
     {
         $tables = number_format((int) ($outcome['tables'] ?? 0));
         $size = $this->size((int) ($outcome['bytes'] ?? 0));
+        $fromFile = $method === self::FROM_FILE;
+        $present = number_format((int) ($checked['destination_tables'] ?? 0));
 
         if ($done) {
-            $this->components->info($dryRun
-                ? 'The source holds '.$tables.' tables ('.$size.') and both databases answered; the destination holds '.number_format((int) ($checked['destination_tables'] ?? 0)).' tables. Nothing was copied.'
-                : $tables.' tables copied ('.$size.' at the source) in '.$this->duration((int) ($outcome['seconds'] ?? 0)).'.');
+            $this->components->info(match (true) {
+                $dryRun && $fromFile => 'The dump holds '.$tables.' tables ('.$size.') and the destination answered; it holds '.$present.' tables. Nothing was copied.',
+                $dryRun => 'The source holds '.$tables.' tables ('.$size.') and both databases answered; the destination holds '.$present.' tables. Nothing was copied.',
+                default => $tables.' tables copied ('.$size.($fromFile ? ' in the dump' : ' at the source').') in '.$this->duration((int) ($outcome['seconds'] ?? 0)).'.',
+            });
 
             return self::SUCCESS;
         }
@@ -369,7 +408,13 @@ final class DbImportCommand extends Command
         $reason = is_string($outcome['reason'] ?? null) ? $outcome['reason'] : '';
 
         if ($kind === 'refused' && isset(self::REFUSALS[$reason])) {
-            $this->components->error(strtr(self::REFUSALS[$reason], [':environment' => $slug, ':tables' => number_format((int) ($outcome['destination_tables'] ?? 0)), ':tool' => is_string($outcome['tool'] ?? null) ? $outcome['tool'] : 'a tool']));
+            $this->components->error(strtr(self::REFUSALS[$reason], [
+                ':environment' => $slug,
+                ':tables' => number_format((int) ($outcome['destination_tables'] ?? 0)),
+                ':tool' => is_string($outcome['tool'] ?? null) ? $outcome['tool'] : 'a tool',
+                ':source_version' => (string) ($outcome['source_version'] ?? ''),
+                ':client_version' => (string) ($outcome['client_version'] ?? ''),
+            ]));
 
             return self::FAILURE;
         }
@@ -377,8 +422,12 @@ final class DbImportCommand extends Command
         $message = is_string($outcome['message'] ?? null) ? $outcome['message'] : '';
 
         if ($kind === 'error' && $message !== '') {
-            $side = ($outcome['side'] ?? null) === 'destination' ? 'the destination' : 'the source';
-            $this->components->error('The copy stopped at '.$side.': '.$message.($method === 'pg'
+            $side = match (true) {
+                ($outcome['side'] ?? null) === 'destination' => 'the destination',
+                $fromFile => 'the dump',
+                default => 'the source',
+            };
+            $this->components->error('The copy stopped at '.$side.': '.$message.(in_array($method, ['pg', self::FROM_FILE], true)
                 ? '. The copy is one transaction, so the database is as it was.'
                 : '. What was copied so far stays; once that is fixed, copy again with --replace.'));
 
@@ -397,7 +446,7 @@ final class DbImportCommand extends Command
      * @param  array<string, int>  $totals
      * @param  array<string, mixed>  $environment
      */
-    private function record(Api $api, array $environment, string $phase, SourceDatabase $source, string $method, bool $replace, bool $dryRun, ?string $outcome = null, array $totals = []): void
+    private function record(Api $api, array $environment, string $phase, SourceDatabase|SourceDump $source, string $method, bool $replace, bool $dryRun, ?string $outcome = null, array $totals = []): void
     {
         try {
             $api->post('/api/environments/'.$environment['id'].'/database/imports/local', [

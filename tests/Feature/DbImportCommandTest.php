@@ -257,6 +257,71 @@ test('without Docker --local says so and starts nothing', function (): void {
     Process::assertDidntRun(static fn (PendingProcess $process): bool => is_array($process->command) && ($process->command[1] ?? null) === 'run');
 });
 
+test('a dump pg_dump wrote is copied from this machine, and only that file is given to the container', function (): void {
+    brewlessDbImports();
+    file_put_contents($this->project.'/shop-2026-10-29.sql', "-- PostgreSQL database dump\nCREATE TABLE public.users (id bigint);\n");
+    fakeDocker(output: implode("\n", [
+        '{"brewless_import":"checked","method":"pgfile","source_version":"16","tables":2,"bytes":9000000,"destination_tables":0}',
+        '{"brewless_import":"progress","tables_done":2,"tables":2}',
+        '{"brewless_import":"done","method":"pgfile","dry_run":0,"tables":2,"bytes":9000000,"seconds":5}',
+    ])."\n");
+
+    $this->artisan('db:import production --file=shop-2026-10-29.sql --force')
+        ->expectsOutputToContain('file://shop-2026-10-29.sql')
+        ->expectsOutputToContain('from this machine in Docker')
+        ->expectsOutputToContain('2 tables copied (9.0 MB in the dump) in 5 s.')
+        ->assertSuccessful();
+
+    Process::assertRan(static function (PendingProcess $process): bool {
+        $command = is_array($process->command) ? $process->command : [];
+
+        if (($command[1] ?? null) !== 'run') {
+            return false;
+        }
+
+        $config = json_decode((string) ($process->environment['IMPORT_CONFIG'] ?? ''), true);
+
+        return in_array('-v', $command, true)
+            && in_array(getcwd().'/shop-2026-10-29.sql:/dump/shop-2026-10-29.sql:ro', $command, true)
+            && $process->environment['IMPORT_METHOD'] === 'pgfile'
+            && $process->environment['SOURCE_FILE'] === '/dump/shop-2026-10-29.sql'
+            && ! isset($process->environment['SOURCE_HOST'])
+            && $config === ['destination_password' => DB_APP_PASSWORD]
+            && $process->environment['DESTINATION_HOST'] === '0f1e2d3c.pg.sdb.fr-par.scw.cloud';
+    });
+
+    $records = Http::recorded(static fn (Request $request): bool => str_ends_with($request->url(), '/database/imports/local'))->values();
+
+    expect(startedDbImport())->toBeNull()
+        ->and($records)->toHaveCount(2)
+        ->and($records[1][0]->data())->toMatchArray([
+            'phase' => 'finished',
+            'source' => ['engine' => 'pgsql', 'file' => 'shop-2026-10-29.sql'],
+            'method' => 'pgfile',
+            'outcome' => 'done',
+            'totals' => ['tables' => 2, 'bytes' => 9000000, 'seconds' => 5],
+        ]);
+});
+
+test('a dump that is not there, is empty, or comes with a database as well, starts nothing', function (string $arguments, string $message): void {
+    brewlessDbImports();
+    fakeDocker();
+    file_put_contents($this->project.'/shop.sql', "-- PostgreSQL database dump\n");
+    file_put_contents($this->project.'/empty.sql', '');
+
+    $this->artisan('db:import production '.$arguments.' --force')
+        ->expectsOutputToContain($message)
+        ->assertFailed();
+
+    expect(startedDbImport())->toBeNull();
+    Process::assertDidntRun(static fn (PendingProcess $process): bool => is_array($process->command) && ($process->command[1] ?? null) === 'run');
+})->with([
+    'no such file' => ['--file=nothing-here.sql', 'There is no file to copy from'],
+    'an empty file' => ['--file=empty.sql', 'is empty, so there is nothing to copy'],
+    'a dump and a database' => ['postgres://vapor@shop-db.example.eu/vapor --file=shop.sql', 'give --file, or the address of a database, not both'],
+    'a dump and a .env' => ['--file=shop.sql --from-env=old.env', 'give --file, or the address of a database, not both'],
+]);
+
 test('db:import-status shows the last copy into the environment', function (): void {
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),

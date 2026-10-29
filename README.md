@@ -82,15 +82,17 @@ See https://docs.brewless.eu/applications/moving-files.
 
 ### Another database
 
-`db:import` copies a PostgreSQL or MySQL database into the database of an
-environment; MySQL into PostgreSQL is converted on the way with pgloader. It
-changes nothing at the source and refuses a destination that holds tables,
-unless you pass `--replace`. By default the copy runs in a job of your own
-Scaleway project; `--local` runs the same script in Docker on this machine.
+`db:import` copies a PostgreSQL or MySQL database, or a dump `pg_dump` wrote,
+into the database of an environment; MySQL into PostgreSQL is converted on the
+way with pgloader. It changes nothing at the source and refuses a destination
+that holds tables, unless you pass `--replace`. By default the copy runs in a
+job of your own Scaleway project; `--local` runs the same script in Docker on
+this machine, and a copy from a file always does.
 
 ```bash
 SOURCE_DB_PASSWORD=… brewless db:import test mysql://brewless-import@shop-db.example.eu/vapor
 brewless db:import production --from-env=../old-app/.env --dry-run   # the DB_* lines of the old application
+brewless db:import test --file=~/dumps/shop.sql                       # a dump on this machine (also .sql.gz, -Fc, -Ft)
 brewless db:import-status production                                  # how far the last copy got
 ```
 
