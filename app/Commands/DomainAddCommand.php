@@ -84,14 +84,49 @@ final class DomainAddCommand extends Command
                 return self::FAILURE;
             }
 
+            $result = is_array($operation['result'] ?? null) ? $operation['result'] : [];
+
+            // Kept at a DNS provider of the customer's own: nothing to wait for here, Brewless looks the record up by itself.
+            if (($result['awaiting_dns'] ?? false) === true) {
+                $this->awaitingDns($hostname, $result);
+                $this->offerAddress($api, $environment, $result);
+
+                return self::SUCCESS;
+            }
+
             $this->components->info('https://'.$hostname.' is live on '.$this->argument('environment').'.');
 
-            $result = is_array($operation['result'] ?? null) ? $operation['result'] : [];
             $this->notices($result);
             $this->offerAddress($api, $environment, $result);
 
             return self::SUCCESS;
         });
+    }
+
+    /**
+     * The record to make at the customer's own DNS provider, and what happens next.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function awaitingDns(string $hostname, array $result): void
+    {
+        $record = is_array($result['record'] ?? null) ? $result['record'] : [];
+
+        $this->components->warn('The DNS of '.$hostname.' is kept where Brewless does not reach. Make this record at your DNS provider:');
+        $this->line('    <options=bold>'.($record['type'] ?? 'CNAME').'</>  '.($record['name'] ?? $hostname).'  ->  '.($record['value'] ?? '?'));
+
+        if (($result['apex'] ?? false) === true) {
+            $this->line('    '.$hostname.' is the domain itself, where a CNAME may not stand: use ALIAS, ANAME or CNAME flattening if your provider has it,');
+            $this->line('    forward it to www.'.$hostname.' at your registrar and add that name instead, or move this zone to Bunny DNS.');
+        }
+
+        if (is_string($result['found'] ?? null)) {
+            $this->line('    Found there now: '.$result['found']);
+        }
+
+        $this->newLine();
+        $this->line('  Brewless looks it up every few minutes and issues the certificate by itself once it points the right way.');
+        $this->line('  Follow it with <options=bold>brewless domain:list '.$this->argument('environment').'</>, or look now with <options=bold>brewless domain:check '.$this->argument('environment').' '.$hostname.'</>.');
     }
 
     /**

@@ -4,6 +4,12 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- A domain whose DNS you keep at a provider of your own no longer makes `domain:add` wait for its certificate: it ends with the record to make there, and Brewless looks it up and issues the certificate by itself (BL-201). On the domain itself, such as `example.eu`, it names the ways around a `CNAME` (BL-204).
+- `domain:list <environment>` lists the domains of an environment with their state, and for one kept elsewhere the record to make and what Brewless last found, as `vapor record:list` did (BL-202).
+- `domain:check <environment> <hostname>` looks the record up now, also for a domain Brewless stopped waiting for (BL-202).
+
 ## 0.18.1 (2026-10-28)
 
 - A release shows the warm-up of the edge as `Edge warmed  216 pages` (with the pages that failed or were left out), and no line when there was nothing to warm (BL-195). The step that subscribes mail events reads `Mail events subscribed` instead of its name.

@@ -103,3 +103,29 @@ test('domain:add without a terminal to ask in only says what to set', function (
 
     Http::assertNotSent(fn (Request $request): bool => $request->method() === 'PUT');
 });
+
+test('with the dns kept at a provider of your own, domain:add ends with the record to make, and does not wait for it', function (): void {
+    $done = [['name' => 'attach_domain', 'status' => 'succeeded'], ['name' => 'dns', 'status' => 'succeeded'], ['name' => 'certificate', 'status' => 'succeeded']];
+
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env1/domains' => Http::sequence()
+            ->push(['data' => ['route' => 'bunny', 'target' => 'shop.b-cdn.net', 'domains' => []]])
+            ->push(domainOperation('succeeded', $done, null, [
+                'awaiting_dns' => true,
+                'apex' => true,
+                'found' => '203.0.113.7',
+                'record' => ['type' => 'ALIAS', 'name' => 'example.eu', 'value' => 'shop.b-cdn.net'],
+                'notices' => [],
+            ]), 201),
+    ]);
+
+    $this->artisan('domain:add', ['environment' => 'production', 'hostname' => 'example.eu'])
+        ->expectsOutputToContain('kept where Brewless does not reach')
+        ->expectsOutputToContain('ALIAS  example.eu  ->  shop.b-cdn.net')
+        ->expectsOutputToContain('where a CNAME may not stand')
+        ->expectsOutputToContain('Found there now: 203.0.113.7')
+        ->expectsOutputToContain('brewless domain:check production example.eu')
+        ->doesntExpectOutputToContain('is live on production')
+        ->assertSuccessful();
+});
