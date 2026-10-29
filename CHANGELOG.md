@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.20.0 (2026-10-29)
 
 - A domain whose DNS you keep at a provider of your own no longer makes `domain:add` wait for its certificate: it ends with the record to make there, and Brewless looks it up and issues the certificate by itself (BL-201). On the domain itself, such as `example.eu`, it names the ways around a `CNAME` (BL-204).
 - `domain:list <environment>` lists the domains of an environment with their state, and for one kept elsewhere the record to make and what Brewless last found, as `vapor record:list` did (BL-202).
