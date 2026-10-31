@@ -4,10 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.23.0 (2026-10-31)
 
 - `db:capacity <environment>` shows the vCPU bounds of an environment's Serverless SQL Database: the normal ones, the ones wanted now, what Scaleway gives right now, and the running and planned boosts, with a notice when Scaleway drifted or a change keeps failing. A shared database says its boosts hold for every environment linked to it (BL-224).
 - `db:boost <environment> --min=4 --max=15 --for=2h` raises them for a while, from now or planned with `--at` and `--until` (`--prewarm`, `--cooldown`, `--name`, `--key`, `--database`). It shows Scaleway's likely cost first, warns that a large raise can restart the database, and asks (`--yes` does not); a boost that starts now is followed until Scaleway gives the new minimum (`--no-wait` does not). `--at` is read in this machine's time zone unless it has an offset (BL-224).
+- A pipeline token may use these commands for the environments of its own application, within the limits of the environment's capacity key (BL-224).
 - `db:boost:extend <environment> <key> --until=…` lets a boost end later, and `db:boost:cancel <environment> <key>` cancels a planned one or ends a running one, which then cools down (BL-224).
 
 ## 0.22.0 (2026-10-29)
