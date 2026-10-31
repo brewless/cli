@@ -4,6 +4,12 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `db:capacity <environment>` shows the vCPU bounds of an environment's Serverless SQL Database: the normal ones, the ones wanted now, what Scaleway gives right now, and the running and planned boosts, with a notice when Scaleway drifted or a change keeps failing. A shared database says its boosts hold for every environment linked to it (BL-224).
+- `db:boost <environment> --min=4 --max=15 --for=2h` raises them for a while, from now or planned with `--at` and `--until` (`--prewarm`, `--cooldown`, `--name`, `--key`, `--database`). It shows Scaleway's likely cost first, warns that a large raise can restart the database, and asks (`--yes` does not); a boost that starts now is followed until Scaleway gives the new minimum (`--no-wait` does not). `--at` is read in this machine's time zone unless it has an offset (BL-224).
+- `db:boost:extend <environment> <key> --until=…` lets a boost end later, and `db:boost:cancel <environment> <key>` cancels a planned one or ends a running one, which then cools down (BL-224).
+
 ## 0.22.0 (2026-10-29)
 
 - `db:import <environment> --file=<dump>` copies a dump `pg_dump` wrote on this machine into the environment's database: plain SQL, the same gzipped, or `pg_dump`'s own format (`-Fc`, `-Ft`), read with `pg_restore`. It always copies from here, in Docker, as `--local` does, because a job in your project cannot reach a file on your machine; the destination has to be PostgreSQL. It is one transaction, so a dump that stops halfway leaves the database as it was, and the audit trail notes the name of the dump, never its path. Lines of a dump made with `pg_dump --create` that name a database of its own are left out (BL-207).

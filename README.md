@@ -98,6 +98,28 @@ brewless db:import-status production                                  # how far 
 
 See https://docs.brewless.eu/applications/moving-a-database.
 
+### Database capacity
+
+A Serverless SQL Database scales between the vCPU bounds you gave it. For a
+sale, a launch or a nightly import you can raise them for a while with a
+boost, now or planned ahead (Business plan and up). A large raise can restart
+the database, closing its connections for up to about two minutes, so a
+planned boost warms up first (15 minutes by default) and cools down after (30).
+Before it is sent you see what Scaleway is likely to bill for it and are asked
+to confirm; `--yes` skips the question in a pipeline, and `--key` makes a step
+that can run twice without boosting twice.
+
+```bash
+brewless db:capacity production                             # the bounds, what Scaleway gives now, and the boosts
+brewless db:boost production --min=4 --max=15 --for=2h      # from now; waits until Scaleway gives 4 vCPU (--no-wait returns at once)
+brewless db:boost production --min=4 --max=15 --at="2027-05-01 10:00" --until=12:00 --name="Spring sale"
+brewless db:boost:extend production spring-sale --until=14:00   # end later
+brewless db:boost:cancel production spring-sale                # a planned one is cancelled, a running one ends and cools down
+```
+
+`--at` is read in the time zone of this machine (`TZ`), unless you give an
+offset: `--at=2027-05-01T10:00:00+02:00`.
+
 ### DNS
 
 The records of a zone at Bunny DNS that Brewless manages for one of your
