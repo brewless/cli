@@ -15,4 +15,8 @@ return [
     // A pipeline token made in the console. When set, it is used instead of
     // the sign-in of this machine, so a pipeline needs no brewless login.
     'token' => env('BREWLESS_API_TOKEN'),
+
+    // The zone a time without an offset is read in (db:boost --at). Unset,
+    // the zone of the system is used.
+    'timezone' => env('TZ'),
 ];
