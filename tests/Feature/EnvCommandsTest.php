@@ -69,9 +69,13 @@ test('with --direct, pull says so when nothing was pushed yet', function (): voi
 
     $this->artisan('env:pull', ['environment' => 'production', '--direct' => true])
         ->expectsOutputToContain('No variables have been pushed for production yet.')
+        ->expectsOutputToContain('Wrote an empty .env.production.')
         ->assertSuccessful();
 
-    expect(is_file($this->project.'/.env.production'))->toBeFalse();
+    $file = $this->project.'/.env.production';
+
+    expect(file_get_contents($file))->toBe('')
+        ->and(substr(sprintf('%o', fileperms($file)), -4))->toBe('0600');
 });
 
 test('with --direct, push writes a new version at scaleway and tells brewless the names only', function (): void {
@@ -236,9 +240,42 @@ test('pull through brewless says so when nothing was pushed yet', function (): v
 
     $this->artisan('env:pull', ['environment' => 'production'])
         ->expectsOutputToContain('No variables have been pushed for production yet.')
+        ->expectsOutputToContain('Wrote an empty .env.production.')
         ->assertSuccessful();
 
-    expect(is_file($this->project.'/.env.production'))->toBeFalse();
+    $file = $this->project.'/.env.production';
+
+    expect(file_get_contents($file))->toBe('')
+        ->and(substr(sprintf('%o', fileperms($file)), -4))->toBe('0600');
+});
+
+test('pull leaves a file that is there alone when nothing was pushed yet', function (): void {
+    throughBrewless(['revision' => null, 'content' => null]);
+    file_put_contents($this->project.'/.env.production', "APP_NAME=Shop\n");
+
+    $this->artisan('env:pull', ['environment' => 'production'])
+        ->expectsOutputToContain('Put the variables production has now in .env.production')
+        ->assertSuccessful();
+
+    expect(file_get_contents($this->project.'/.env.production'))->toBe("APP_NAME=Shop\n");
+});
+
+test('the empty file pull leaves is refused as a first push, and a filled one goes', function (): void {
+    throughBrewless(['revision' => null, 'content' => null], put: ['data' => ['revision' => 1]]);
+
+    $this->artisan('env:pull', ['environment' => 'production'])->assertSuccessful();
+
+    $this->artisan('env:push', ['environment' => 'production'])
+        ->expectsOutputToContain('.env.production is empty, and nothing has been pushed for production yet.')
+        ->assertFailed();
+
+    expect(pushedFile())->toBeNull();
+
+    file_put_contents($this->project.'/.env.production', "APP_NAME=Shop\n");
+
+    $this->artisan('env:push', ['environment' => 'production'])
+        ->expectsOutputToContain('Pushed revision 1 (1 variables)')
+        ->assertSuccessful();
 });
 
 test('push sends the file to brewless with the revision it was pulled at', function (): void {

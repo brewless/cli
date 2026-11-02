@@ -43,10 +43,7 @@ final class EnvPullCommand extends Command
             }
 
             if ($latest === null) {
-                $this->components->info('No variables have been pushed for '.$slug.' yet.');
-                $this->line('  Put them in '.basename($path).' and run: brewless env:push '.$slug);
-
-                return self::SUCCESS;
+                return $this->nothingPushed($slug, $path);
             }
 
             // Created empty with the right mode first, so the values are never in a file others can read.
@@ -60,6 +57,30 @@ final class EnvPullCommand extends Command
 
             return self::SUCCESS;
         });
+    }
+
+    /**
+     * Nothing to fetch yet: an empty file to fill in, so the push this
+     * points to has a file to push. A file that is there already is left
+     * as it is.
+     */
+    private function nothingPushed(string $slug, string $path): int
+    {
+        $this->components->info('No variables have been pushed for '.$slug.' yet.');
+
+        if (is_file($path)) {
+            $this->line('  Put the variables '.$slug.' has now in '.basename($path).' and run: brewless env:push '.$slug);
+
+            return self::SUCCESS;
+        }
+
+        touch($path);
+        chmod($path, 0600);
+
+        $this->line('  Wrote an empty '.basename($path).'. Put the variables '.$slug.' has now in it and run: brewless env:push '.$slug);
+        $this->keepOutOfGit($path);
+
+        return self::SUCCESS;
     }
 
     /**

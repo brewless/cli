@@ -4,6 +4,11 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## Unreleased
+
+- `env:pull` for an environment nothing was pushed for yet writes an empty `.env.<environment>` (mode 0600, with the `.gitignore` check) to fill in, and leaves a file that is there already alone. Before, it wrote nothing, and `env:push` then sent you back to `env:pull`.
+- `env:push` refuses an empty file as the first push of an environment: that is the file to fill in, not "no variables".
+
 ## 0.23.0 (2026-10-31)
 
 - `db:capacity <environment>` shows the vCPU bounds of an environment's Serverless SQL Database: the normal ones, the ones wanted now, what Scaleway gives right now, and the running and planned boosts, with a notice when Scaleway drifted or a change keeps failing. A shared database says its boosts hold for every environment linked to it (BL-224).
