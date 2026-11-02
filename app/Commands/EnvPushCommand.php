@@ -39,12 +39,18 @@ final class EnvPushCommand extends Command
             $local = (string) file_get_contents($path);
             $content = EnvFile::withoutHeader($local);
 
+            $state = $api->get('/api/environments/'.$environment['id'].'/secrets')['data'] ?? [];
+
+            // An empty first push is the file env:pull left to fill in, not "no variables".
+            if (trim($content) === '' && ! is_int($state['revision'] ?? null)) {
+                throw new RuntimeException(basename($path).' is empty, and nothing has been pushed for '.$slug.' yet. Put the variables '.$slug.' has now in it first.');
+            }
+
             // Scaleway does not take an empty version, so "no variables" is said in a comment.
             if (trim($content) === '') {
                 $content = EnvFile::NONE;
             }
             $names = EnvFile::names($content);
-            $state = $api->get('/api/environments/'.$environment['id'].'/secrets')['data'] ?? [];
 
             return $this->option('direct')
                 ? $this->direct($api, (string) $environment['id'], $slug, $path, $local, $content, $names, $state)
