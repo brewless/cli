@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.23.1 (2026-11-02)
 
 - `env:pull` for an environment nothing was pushed for yet writes an empty `.env.<environment>` (mode 0600, with the `.gitignore` check) to fill in, and leaves a file that is there already alone. Before, it wrote nothing, and `env:push` then sent you back to `env:pull`.
 - `env:push` refuses an empty file as the first push of an environment: that is the file to fill in, not "no variables".
