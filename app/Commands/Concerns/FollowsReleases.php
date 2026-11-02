@@ -305,6 +305,12 @@ trait FollowsReleases
         }
 
         $result = $release['operation']['result'] ?? null;
+
+        // That the edge caches the site: Brewless asked the homepage twice after the deploy.
+        if (is_array($result) && is_string($result['edge'] ?? null) && $result['edge'] !== '') {
+            $this->line('  <fg=green>✓</> '.$result['edge']);
+        }
+
         $this->notices(is_array($result) ? $result : []);
 
         return true;

@@ -290,13 +290,14 @@ test('a live release passes on what Brewless wants the customer to know', functi
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => [
             'steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers'),
-            'result' => ['notices' => ['APP_URL is still https://shop.b-cdn.net, the provider\'s own address.']],
+            'result' => ['notices' => ['APP_URL is still https://shop.b-cdn.net, the provider\'s own address.'], 'edge' => 'bunny.net caches the homepage of shop.example.com.'],
         ]])]),
         'https://acme.brewless.eu/cli/api/environments/env1/addresses' => Http::response(['data' => []]),
     ]);
 
     $this->artisan('deploy', ['environment' => 'production'])
         ->expectsOutputToContain('Release 2 is live.')
+        ->expectsOutputToContain('bunny.net caches the homepage of shop.example.com.')
         ->expectsOutputToContain('APP_URL is still https://shop.b-cdn.net')
         ->assertSuccessful();
 });

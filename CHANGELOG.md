@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.24.0 (2026-11-02)
+
+- `deploy` says when bunny.net caches the site: after the release is live, a line such as `✓ bunny.net caches the homepage of example.com` when Brewless asked the homepage again and it came from the edge. What stands in the way (a cookie, a Cache-Control, files over `http://` or from the container's own address) stays a warning, with what helps.
+
 ## 0.23.1 (2026-11-02)
 
 - `env:pull` for an environment nothing was pushed for yet writes an empty `.env.<environment>` (mode 0600, with the `.gitignore` check) to fill in, and leaves a file that is there already alone. Before, it wrote nothing, and `env:push` then sent you back to `env:pull`.
