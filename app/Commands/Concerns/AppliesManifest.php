@@ -62,7 +62,8 @@ trait AppliesManifest
                 'edge' => $running,
                 'database' => self::databaseName($settings) === null,
                 'queue' => ($settings['queue'] ?? null) !== 'sqs',
-                'bucket' => ! is_string($settings['storage'] ?? null),
+                // A name, or a map with name, keep_versions_days and cdn.
+                'bucket' => ! isset($settings['storage']) || $settings['storage'] === false,
                 'backup_bucket' => ! is_array($settings['backup'] ?? null),
                 'runtime_databases' => ! is_array($settings['databases'] ?? null),
                 // A cache is reached over the network only, so it brings the network along.

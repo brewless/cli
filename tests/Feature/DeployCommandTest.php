@@ -423,6 +423,48 @@ test('an environment the file names that does not exist yet is made and set up b
     'as a map' => ["database:\n      name: shop-preview\n      standby: true"],
 ]);
 
+test('a bucket for files named as a map has its line while the environment is set up, as one named by its name does', function (string $storage): void {
+    signedIn();
+    repository();
+    file_put_contents(getcwd().'/brewless.yml', <<<YAML
+        organisation: acme
+        application: shop
+        environments:
+          preview:
+            kind: development
+            {$storage}
+        YAML);
+
+    $withPreview = applications();
+    $withPreview['data'][0]['environments'][] = ['id' => 'env3', 'slug' => 'preview', 'name' => 'Preview'];
+    $setup = static fn (string ...$succeeded): array => ['id' => 'op1', 'status' => count($succeeded) === 8 ? 'succeeded' : 'running', 'steps' => array_map(
+        static fn (string $name): array => ['name' => $name, 'status' => in_array($name, $succeeded, true) ? 'succeeded' : 'pending'],
+        ['registry', 'namespace', 'queue', 'bucket', 'containers', 'edge', 'variables', 'record'],
+    )];
+
+    Http::fake([
+        'https://acme.brewless.eu/cli/api/applications' => Http::sequence()->push(applications())->push($withPreview),
+        'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::sequence()
+            ->push(['data' => applied(['created' => true, 'running' => false, 'environment' => ['slug' => 'preview', 'kind' => 'development', 'region' => 'fr-par'], 'operation' => $setup()])])
+            ->push(['data' => applied(['environment' => ['slug' => 'preview', 'kind' => 'development', 'region' => 'fr-par']])]),
+        'https://acme.brewless.eu/cli/api/operations/op1' => Http::response(['data' => $setup('registry', 'namespace', 'queue', 'bucket', 'containers', 'edge', 'variables', 'record')]),
+        'https://acme.brewless.eu/cli/api/environments/env3/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
+        'https://acme.brewless.eu/cli/api/environments/env3/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
+        'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
+        'https://acme.brewless.eu/cli/api/environments/env3/addresses' => Http::response(['data' => []]),
+    ]);
+
+    $this->artisan('deploy', ['environment' => 'preview'])
+        ->expectsOutputToContain('Setting preview up from brewless.yml')
+        ->expectsOutputToContain('Bucket for files')
+        ->expectsOutputToContain('Release 2 is live.')
+        ->assertSuccessful();
+})->with([
+    'by its name' => ['storage: shop-files'],
+    'as a map' => ["storage:\n      name: shop-files\n      cdn: files.example.eu"],
+]);
+
 test('a set-up that fails deploys nothing', function (): void {
     signedIn();
     repository();

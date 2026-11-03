@@ -27,13 +27,18 @@ trait FollowsReleases
         'edge' => 'Edge settings checked',
         'attach_assets' => 'Built files served from your storage zone',
         'preview' => 'Test address',
+        'files_edge' => 'Files address',
         'standby' => 'Standby copy of the database asked for',
         'edge_warm' => 'Edge warmed',
         'mail_events' => 'Mail events subscribed',
     ];
 
-    /** Steps that only do something when brewless.yml asks: without that they have no line. */
-    private const array ONLY_WHEN_ASKED = ['standby', 'edge_warm'];
+    /**
+     * Steps that only do something when brewless.yml asks, or when the
+     * environment has what they work on (a bucket for files behind bunny.net
+     * for the files address): without that they have no line.
+     */
+    private const array ONLY_WHEN_ASKED = ['standby', 'edge_warm', 'files_edge'];
 
     private const array OVER = ['active', 'superseded', 'failed', 'cancelled'];
 
