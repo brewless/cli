@@ -61,12 +61,12 @@ trait FollowsReleases
     protected function follow(Api $api, array $release): array
     {
         $printed = [];
-        $started = Carbon::now();
+        // Each step is timed on its own: from the moment the step before it ended.
+        $stepStarted = Carbon::now();
         // A terminal someone watches gets a live line; a log gets only finished steps.
         $live = $this->input->isInteractive()
             && $this->output->isDecorated()
             && (stream_isatty(STDOUT) || $this->laravel->runningUnitTests());
-        $running = null;
         $frame = 0;
         $drawn = false;
         $unansweredSince = null;
@@ -83,6 +83,7 @@ trait FollowsReleases
                 // Housekeeping around the switch that is only worth a line when it fails, and a step the file did not ask for.
                 if ($status === 'succeeded' && ($name === 'detach_assets' || (in_array($name, self::ONLY_WHEN_ASKED, true) && ($step['skipped'] ?? false) === true))) {
                     $printed[$name] = $status;
+                    $stepStarted = Carbon::now();
 
                     continue;
                 }
@@ -91,7 +92,8 @@ trait FollowsReleases
                 // What the step did, when Brewless says it in a few words: "216 pages".
                 $summary = is_string($step['summary'] ?? null) && $step['summary'] !== '' && $status === 'succeeded' ? '  '.OutputFormatter::escape($step['summary']) : '';
                 $label = $this->stepLabel($name, $release).$summary;
-                $elapsed = sprintf('%3ds', (int) $started->diffInSeconds(Carbon::now(), true));
+                $elapsed = sprintf('%3ds', (int) $stepStarted->diffInSeconds(Carbon::now(), true));
+                $stepStarted = Carbon::now();
 
                 if ($drawn) {
                     $this->clearLiveLine();
@@ -116,17 +118,10 @@ trait FollowsReleases
             } else {
                 $step = $this->runningStep($release);
 
-                // The clock of a step starts when it is first seen at work.
-                if ($step === null) {
-                    $running = null;
-                } elseif (($running['name'] ?? null) !== $step['name']) {
-                    $running = ['name' => (string) $step['name'], 'since' => Carbon::now()];
-                }
-
                 // Still three seconds between two looks, with the line drawn in between.
                 for ($tick = 0; $tick < self::FRAMES_PER_POLL; $tick++) {
-                    if ($step !== null && $running !== null) {
-                        $this->drawLiveLine($release, $step, $running['since'], $frame++);
+                    if ($step !== null) {
+                        $this->drawLiveLine($release, $step, $stepStarted, $frame++);
                         $drawn = true;
                     }
 

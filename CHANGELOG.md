@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.24.1 (2026-11-03)
+
+- `deploy`, `rollback` and the other commands that follow a release show how long each step took, not the time since the deploy began. The live line counts from the same moment, so the two always agree.
+
 ## 0.24.0 (2026-11-02)
 
 - `deploy` says when bunny.net caches the site: after the release is live, a line such as `✓ bunny.net caches the homepage of example.com` when Brewless asked the homepage again and it came from the edge. What stands in the way (a cookie, a Cache-Control, files over `http://` or from the container's own address) stays a warning, with what helps.

@@ -113,7 +113,7 @@ test('the running step gets a live line with its seconds, replaced by the finish
         ->toContain('  ✓ Image still in your registry')
         ->toContain('  ✓ Release commands')
         ->toContain('  ✓ Web container live and healthy')
-        ->toContain("  ✓ Workers and schedule   6s\n\n   INFO  Release 4 is live.")
+        ->toContain("  ✓ Release commands   6s\n  ✓ Web container live and healthy   0s\n  ✓ Workers and schedule   0s\n\n   INFO  Release 4 is live.")
         ->not->toMatch('/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u');
 });
 
@@ -174,7 +174,7 @@ test('without a terminal to redraw, or with --no-interaction, only finished step
     expect($printed)
         ->not->toContain("\e[2K")
         ->not->toContain('Still running.')
-        ->toContain("  ✓ Image still in your registry   0s\n  ✓ Release commands   3s\n  ✓ Web container live and healthy   3s\n  ✓ Workers and schedule   3s\n");
+        ->toContain("  ✓ Image still in your registry   0s\n  ✓ Release commands   3s\n  ✓ Web container live and healthy   0s\n  ✓ Workers and schedule   0s\n");
 
     // One look every three seconds, as before.
     Sleep::assertSequence([Sleep::for(3)->seconds()]);
