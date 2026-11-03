@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.24.2 (2026-11-03)
 
 - `deploy`, `rollback` and the other commands that follow a release show the new **Files address** step with its hostname (`✓ Files address  cdn.example.com`), and no line when the environment has no bucket for files behind bunny.net. Brewless gives the public files of such a bucket an address of its own; see `storage.cdn` in `brewless.yml`.
 - Setting an environment up from `brewless.yml` shows the bucket for files also when `storage` is a map (`name`, `keep_versions_days`, `cdn`); before, only the name form had its line.
