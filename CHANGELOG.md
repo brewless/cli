@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
+## 0.25.0 (2026-11-04)
+
+- `deploy` packs the commit without gzip. On a repository that holds media, gzip costs seconds of processor time for about a per cent of size: measured on a 700 MB working tree, 19.9 s to take off 24 MB, and `gzip -1` is no faster on data that does not compress. The upload goes straight into a bucket of your own project over a fast line, so those seconds bought nothing. Brewless reads a compressed archive too, so an older client keeps working.
+
 ## 0.24.2 (2026-11-03)
 
 - `deploy`, `rollback` and the other commands that follow a release show the new **Files address** step with its hostname (`✓ Files address  cdn.example.com`), and no line when the environment has no bucket for files behind bunny.net. Brewless gives the public files of such a bucket an address of its own; see `storage.cdn` in `brewless.yml`.
