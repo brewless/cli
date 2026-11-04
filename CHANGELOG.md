@@ -1,8 +1,14 @@
 # Changelog
 
 All notable changes to the Brewless command line client. Versions follow
-[semantic versioning](https://semver.org); before 1.0 a minor version may
-change how a command behaves.
+[semantic versioning](https://semver.org): from 1.0 on, the way a command
+behaves only changes in a major version.
+
+## 1.0.0 (2026-11-04)
+
+- First stable release. The commands, their options and their output are what
+  they will stay, and a change to any of them now needs a major version. No
+  code changed since 0.25.0.
 
 ## 0.25.0 (2026-11-04)
 
