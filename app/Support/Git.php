@@ -36,11 +36,17 @@ final class Git
     /**
      * Pack the commit and return the path of the archive.
      */
+    /**
+     * The commit, packed and not compressed. gzip costs seconds of processor
+     * time for about a per cent of size on a repository that holds media: on a
+     * 700 MB working tree, 20 s to take off 24 MB. The upload goes to a bucket
+     * in your own project over a fast line, so those seconds buy nothing.
+     */
     public function archive(): string
     {
-        $path = sys_get_temp_dir().'/brewless-source-'.bin2hex(random_bytes(8)).'.tar.gz';
+        $path = sys_get_temp_dir().'/brewless-source-'.bin2hex(random_bytes(8)).'.tar';
 
-        $this->run('git archive --format=tar.gz -o '.escapeshellarg($path).' HEAD', 'Could not pack the commit.');
+        $this->run('git archive --format=tar -o '.escapeshellarg($path).' HEAD', 'Could not pack the commit.');
 
         return $path;
     }

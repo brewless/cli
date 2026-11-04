@@ -55,12 +55,12 @@ test('deploy uploads the commit to the customer project, starts a release and fo
 
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => function (Request $request) use (&$upload) {
             // Read while the command still holds the file open.
             $upload = [
                 'body' => $request->body(),
-                'streamed' => str_ends_with((string) $request->toPsrRequest()->getBody()->getMetadata('uri'), '.tar.gz'),
+                'streamed' => str_ends_with((string) $request->toPsrRequest()->getBody()->getMetadata('uri'), '.tar'),
                 'size' => $request->toPsrRequest()->getBody()->getSize(),
             ];
 
@@ -106,7 +106,7 @@ test('deploy asks for the PHP version brewless.yml names, quoted or not, and pas
 
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['errors' => ['php' => ['That PHP version cannot be built. Choose one of: 8.3, 8.4, 8.5.']]], 422),
     ]);
@@ -285,7 +285,7 @@ test('a live release passes on what Brewless wants the customer to know', functi
 
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => [
@@ -321,7 +321,7 @@ test('deploy sends the whole of brewless.yml along, for Brewless to apply what i
 
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
@@ -357,7 +357,7 @@ test('what Brewless refuses in brewless.yml at a deploy is shown with its line, 
 
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['message' => 'invalid', 'errors' => ['manifest.environments.production.web.memory' => ['Give memory from 500 to 2000 megabytes with this cpu.']]], 422),
     ]);
@@ -398,7 +398,7 @@ test('an environment the file names that does not exist yet is made and set up b
             // Applied again once it runs: the database Brewless manages already is linked then.
             ->push(['data' => applied(['environment' => ['slug' => 'preview', 'kind' => 'development', 'region' => 'fr-par'], 'database_link' => ['id' => 'op9', 'status' => 'succeeded', 'steps' => [['name' => 'access', 'status' => 'succeeded'], ['name' => 'variables', 'status' => 'succeeded']]]])]),
         'https://acme.brewless.eu/cli/api/operations/op1' => Http::response(['data' => $setup('registry', 'namespace', 'database', 'queue', 'bucket', 'containers', 'edge', 'variables', 'record')]),
-        'https://acme.brewless.eu/cli/api/environments/env3/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env3/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env3/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
@@ -450,7 +450,7 @@ test('domains the environment lacks are added only after a yes or with --domains
         'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => fn (Request $request) => Http::response(['data' => ($request['domains'] ?? false) === true
             ? applied(['domains' => [['hostname' => 'shop.example.eu', 'id' => 'op2', 'status' => 'queued']]])
             : applied(['missing_domains' => ['shop.example.eu'], 'released' => ['shop-main']])]),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
@@ -492,7 +492,7 @@ test('the dns records mail needs are written only after a yes or with --mail-rec
                 ['name' => '_dmarc.shop.example.eu', 'type' => 'TXT', 'value' => 'v=DMARC1; p=none', 'action' => 'add', 'in_zone' => true],
                 ['name' => 'p1._domainkey.other.eu', 'type' => 'TXT', 'value' => 'v=DKIM1; p=AAA', 'action' => 'add', 'in_zone' => false],
             ]])]),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
@@ -528,7 +528,7 @@ test('a Brewless that does not set environments up from the file yet still deplo
     Http::fake([
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
         'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::response(['message' => 'Not Found'], 404),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),
@@ -552,7 +552,7 @@ test('a cache in the file shows its network and cache steps; without one they st
         'https://acme.brewless.eu/cli/api/applications' => Http::response(applications()),
         'https://acme.brewless.eu/cli/api/applications/app1/manifest/apply' => Http::sequence()
             ->push(['data' => applied(['running' => true, 'operation' => $operation])]),
-        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar.gz?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
+        'https://acme.brewless.eu/cli/api/environments/env1/releases/source' => Http::response(['data' => ['url' => 'https://bucket.s3.fr-par.scw.cloud/source/shop/'.COMMIT.'.tar?X-Amz-Signature=abc', 'method' => 'PUT', 'expires_in' => 900]]),
         'https://bucket.s3.fr-par.scw.cloud/*' => Http::response('', 200),
         'https://acme.brewless.eu/cli/api/environments/env1/releases' => Http::response(['data' => release(['operation' => ['steps' => steps()]])], 201),
         'https://acme.brewless.eu/cli/api/releases/r2' => Http::response(['data' => release(['status' => 'active', 'operation' => ['steps' => steps('source', 'build', 'image', 'migrate', 'activate', 'workers')]])]),

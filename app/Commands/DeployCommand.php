@@ -72,7 +72,7 @@ final class DeployCommand extends Command
             }
 
             try {
-                $upload = Http::timeout(900)->withBody($source, 'application/gzip')->put((string) $link['url']);
+                $upload = Http::timeout(900)->withBody($source, 'application/x-tar')->put((string) $link['url']);
             } finally {
                 fclose($source);
                 @unlink($archive);
