@@ -113,7 +113,7 @@ test('the running step gets a live line with its seconds, replaced by the finish
         ->toContain('  ✓ Image still in your registry')
         ->toContain('  ✓ Release commands')
         ->toContain('  ✓ Web container live and healthy')
-        ->toContain("  ✓ Workers and schedule   6s\n\n   INFO  Release 4 is live.")
+        ->toContain("  ✓ Release commands   6s\n  ✓ Web container live and healthy   0s\n  ✓ Workers and schedule   0s\n\n   INFO  Release 4 is live.")
         ->not->toMatch('/[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏]/u');
 });
 
@@ -174,7 +174,7 @@ test('without a terminal to redraw, or with --no-interaction, only finished step
     expect($printed)
         ->not->toContain("\e[2K")
         ->not->toContain('Still running.')
-        ->toContain("  ✓ Image still in your registry   0s\n  ✓ Release commands   3s\n  ✓ Web container live and healthy   3s\n  ✓ Workers and schedule   3s\n");
+        ->toContain("  ✓ Image still in your registry   0s\n  ✓ Release commands   3s\n  ✓ Web container live and healthy   0s\n  ✓ Workers and schedule   0s\n");
 
     // One look every three seconds, as before.
     Sleep::assertSequence([Sleep::for(3)->seconds()]);
@@ -273,4 +273,18 @@ test('the warm-up says how many pages it asked, and has no line when there was n
 })->with([
     'warmed' => [false, true],
     'nothing to warm' => [true, false],
+]);
+
+test('the files address has a line with its hostname, and none when the environment has nothing for it', function (bool $skipped, bool $shown): void {
+    $done = array_map(static fn (string $name): array => ['name' => $name, 'status' => 'succeeded', 'attempts' => 1, 'error_message' => null, 'skipped' => $name === 'files_edge' && $skipped, 'summary' => $name === 'files_edge' && ! $skipped ? 'cdn.shop.example' : null], ['image', 'migrate', 'activate', 'workers', 'preview', 'files_edge']);
+
+    $screen = screen(rollbackPrinting([
+        rollbackRelease(['status' => 'active', 'operation' => ['status' => 'succeeded', 'steps' => $done]]),
+    ]));
+
+    expect(str_contains($screen, '✓ Files address  cdn.shop.example'))->toBe($shown)
+        ->and($screen)->not->toContain('files_edge');
+})->with([
+    'made' => [false, true],
+    'no bucket or no edge' => [true, false],
 ]);

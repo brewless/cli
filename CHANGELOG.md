@@ -4,7 +4,20 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org); before 1.0 a minor version may
 change how a command behaves.
 
-## Unreleased
+## 0.24.2 (2026-11-03)
+
+- `deploy`, `rollback` and the other commands that follow a release show the new **Files address** step with its hostname (`✓ Files address  cdn.example.com`), and no line when the environment has no bucket for files behind bunny.net. Brewless gives the public files of such a bucket an address of its own; see `storage.cdn` in `brewless.yml`.
+- Setting an environment up from `brewless.yml` shows the bucket for files also when `storage` is a map (`name`, `keep_versions_days`, `cdn`); before, only the name form had its line.
+
+## 0.24.1 (2026-11-03)
+
+- `deploy`, `rollback` and the other commands that follow a release show how long each step took, not the time since the deploy began. The live line counts from the same moment, so the two always agree.
+
+## 0.24.0 (2026-11-02)
+
+- `deploy` says when bunny.net caches the site: after the release is live, a line such as `✓ bunny.net caches the homepage of example.com` when Brewless asked the homepage again and it came from the edge. What stands in the way (a cookie, a Cache-Control, files over `http://` or from the container's own address) stays a warning, with what helps.
+
+## 0.23.1 (2026-11-02)
 
 - `env:pull` for an environment nothing was pushed for yet writes an empty `.env.<environment>` (mode 0600, with the `.gitignore` check) to fill in, and leaves a file that is there already alone. Before, it wrote nothing, and `env:push` then sent you back to `env:pull`.
 - `env:push` refuses an empty file as the first push of an environment: that is the file to fill in, not "no variables".
