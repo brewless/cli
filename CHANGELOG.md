@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org): from 1.0 on, the way a command
 behaves only changes in a major version.
 
+## Unreleased
+
+- `wakes <environment>` lists the addresses that reached the web container over the last 24 hours, read from bunny.net's request log: what the edge did not answer itself, most first, with the cache status. It is what keeps a serverless container awake. Of a query string only the names are shown. Needs Brewless with the wakers route (BL-251).
+
 ## 1.1.0 (2026-11-05)
 
 - `edge:rotate-secret <environment>` replaces the secret with which the edge proves to your containers that a request came through it. The containers hold the new secret and the one before it until the edge has moved over, so the site keeps answering throughout; it takes two releases of the image that is live. Needs `brewless/laravel` 1.2 or later in the application, and says so when it is older instead of replacing the secret.
