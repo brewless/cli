@@ -19,15 +19,18 @@ trait FollowsReleases
 {
     private const array STEP_LABELS = [
         'source' => 'Source in your project',
+        'realtime_prepare' => 'Realtime server prepared',
         'build' => 'Build started in your project',
         'image' => 'Image built and pushed',
         'migrate' => 'Release commands',
         'activate' => 'Web container live and healthy',
         'workers' => 'Workers and schedule',
+        'realtime' => 'Realtime server',
         'edge' => 'Edge settings checked',
         'attach_assets' => 'Built files served from your storage zone',
         'preview' => 'Test address',
         'files_edge' => 'Files address',
+        'realtime_address' => 'Realtime address',
         'standby' => 'Standby copy of the database asked for',
         'edge_warm' => 'Edge warmed',
         'mail_events' => 'Mail events subscribed',
@@ -38,7 +41,7 @@ trait FollowsReleases
      * environment has what they work on (a bucket for files behind bunny.net
      * for the files address): without that they have no line.
      */
-    private const array ONLY_WHEN_ASKED = ['standby', 'edge_warm', 'files_edge'];
+    private const array ONLY_WHEN_ASKED = ['standby', 'edge_warm', 'files_edge', 'realtime_prepare', 'realtime', 'realtime_address'];
 
     private const array OVER = ['active', 'superseded', 'failed', 'cancelled'];
 

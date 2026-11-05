@@ -288,3 +288,21 @@ test('the files address has a line with its hostname, and none when the environm
     'made' => [false, true],
     'no bucket or no edge' => [true, false],
 ]);
+
+test('the realtime server has its lines with where browsers connect, and none when brewless.yml asks for none', function (bool $skipped, bool $shown): void {
+    $realtime = ['realtime_prepare', 'realtime', 'realtime_address'];
+    $summaries = ['realtime' => 'wss://ws.shop.example', 'realtime_address' => 'ws.shop.example'];
+    $done = array_map(static fn (string $name): array => ['name' => $name, 'status' => 'succeeded', 'attempts' => 1, 'error_message' => null, 'skipped' => in_array($name, $realtime, true) && $skipped, 'summary' => $skipped ? null : ($summaries[$name] ?? null)], ['image', 'migrate', 'activate', 'workers', ...$realtime]);
+
+    $screen = screen(rollbackPrinting([
+        rollbackRelease(['status' => 'active', 'operation' => ['status' => 'succeeded', 'steps' => $done]]),
+    ]));
+
+    expect(str_contains($screen, '✓ Realtime server  wss://ws.shop.example'))->toBe($shown)
+        ->and(str_contains($screen, '✓ Realtime address  ws.shop.example'))->toBe($shown)
+        ->and(str_contains($screen, 'Realtime server prepared'))->toBe($shown)
+        ->and($screen)->not->toContain('realtime_');
+})->with([
+    'asked for' => [false, true],
+    'not asked for' => [true, false],
+]);
