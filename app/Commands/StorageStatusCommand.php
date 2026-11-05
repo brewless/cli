@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Commands;
 
 use App\Commands\Concerns\FollowsImports;
+use App\Commands\Concerns\ShowsLocalTimes;
 use App\Commands\Concerns\TalksToBrewless;
 use LaravelZero\Framework\Commands\Command;
 
 final class StorageStatusCommand extends Command
 {
     use FollowsImports;
+    use ShowsLocalTimes;
     use TalksToBrewless;
 
     protected $signature = 'storage:status {environment : The environment whose bucket the copy goes into}';
@@ -35,7 +37,7 @@ final class StorageStatusCommand extends Command
             }
 
             $this->newLine();
-            $this->line('  Copy into the bucket of <options=bold>'.$slug.'</>, started '.($operation['created_at'] ?? '').(is_string($operation['actor_name'] ?? null) ? ' by '.$operation['actor_name'] : ''));
+            $this->line('  Copy into the bucket of <options=bold>'.$slug.'</>, started '.$this->localMoment($operation['created_at'] ?? null).(is_string($operation['actor_name'] ?? null) ? ' by '.$operation['actor_name'] : ''));
 
             if (in_array($operation['status'] ?? '', ['queued', 'running'], true)) {
                 $this->line('  '.$this->importLine($operation));

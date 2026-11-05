@@ -206,6 +206,42 @@ trait FollowsReleases
     }
 
     /**
+     * The newest release that is not over yet: an environment has at most one.
+     *
+     * @param  list<array<string, mixed>>  $releases  newest first
+     * @return array<string, mixed>|null
+     */
+    private function releaseUnderWay(array $releases): ?array
+    {
+        foreach ($releases as $release) {
+            if (! in_array($release['status'] ?? '', self::OVER, true)) {
+                return $release;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Say what cancelling a release did: one that waited is over, one at work
+     * on a step finishes that step first.
+     *
+     * @param  array<string, mixed>  $release  as Brewless answered the cancel
+     */
+    private function reportCancel(array $release, string $slug): void
+    {
+        if (($release['status'] ?? '') === 'cancelled') {
+            $this->components->info('Release '.$release['number'].' is cancelled.');
+
+            return;
+        }
+
+        $step = $this->runningStep($release);
+
+        $this->components->info('Release '.$release['number'].' stops after the step it is on'.($step === null ? '' : ': '.$this->stepLabel((string) $step['name'], $release)).'. See it end with: brewless releases '.$slug);
+    }
+
+    /**
      * Redraw the one line that says what is going on right now: the step, how
      * long it has been at work, and what it waits for.
      *

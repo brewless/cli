@@ -9,6 +9,7 @@ use App\Commands\Concerns\FollowsReleases;
 use App\Commands\Concerns\ReportsManifestErrors;
 use App\Commands\Concerns\SetsEnvironmentsUp;
 use App\Commands\Concerns\TalksToBrewless;
+use App\Support\Api;
 use App\Support\ApiException;
 use App\Support\Git;
 use App\Support\Manifest;
@@ -16,8 +17,9 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use LaravelZero\Framework\Commands\Command;
 use RuntimeException;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 
-final class DeployCommand extends Command
+final class DeployCommand extends Command implements SignalableCommandInterface
 {
     use AppliesManifest;
     use FollowsReleases;
@@ -30,6 +32,9 @@ final class DeployCommand extends Command
         {--mail-records : Write the DNS records the mail domain needs in a zone Brewless manages, without asking}';
 
     protected $description = 'Deploy the current commit to an environment';
+
+    /** @var array{api: Api, release: array<string, mixed>, slug: string}|null the release this run started, once it did */
+    private ?array $following = null;
 
     public function handle(): int
     {
@@ -104,8 +109,48 @@ final class DeployCommand extends Command
             }
 
             $this->line('  Release '.$release['number'].(is_string($release['php_version'] ?? null) ? ', PHP '.$release['php_version'] : ''));
+            $this->following = ['api' => $api, 'release' => $release, 'slug' => $slug];
 
             return $this->conclude($api, $this->follow($api, $release), $environment) ? self::SUCCESS : self::FAILURE;
         });
+    }
+
+    /**
+     * A pipeline whose run is stopped sends SIGTERM: the release this run
+     * started is cancelled with it, or it would go on at Brewless while the
+     * pipeline says it stopped (BL-257). Ctrl-C only stops following.
+     *
+     * @return list<int>
+     */
+    public function getSubscribedSignals(): array
+    {
+        return defined('SIGTERM') && defined('SIGINT') ? [\SIGTERM, \SIGINT] : [];
+    }
+
+    public function handleSignal(int $signal, int|false $previousExitCode = 0): int|false
+    {
+        if ($this->following === null) {
+            // Before a release was started there is nothing to stop but this command.
+            return defined('SIGINT') && $signal === \SIGINT ? 130 : self::FAILURE;
+        }
+
+        ['api' => $api, 'release' => $release, 'slug' => $slug] = $this->following;
+        $this->newLine();
+
+        if (defined('SIGINT') && $signal === \SIGINT) {
+            $this->line('  Stopped following. Release '.$release['number'].' goes on at Brewless; stop it with: brewless cancel '.$slug);
+
+            return 130;
+        }
+
+        $this->line('  The run was stopped. Cancelling release '.$release['number'].'.');
+
+        try {
+            $this->reportCancel($api->post('/api/releases/'.$release['id'].'/cancel')['data'] ?? $release, $slug);
+        } catch (ApiException $exception) {
+            $this->components->error('Release '.$release['number'].' could not be cancelled: '.$exception->getMessage().' Cancel it with: brewless cancel '.$slug);
+        }
+
+        return self::FAILURE;
     }
 }
