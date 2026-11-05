@@ -216,8 +216,11 @@ test('--no-follow starts the copy and returns, and storage:status shows it', fun
 
     expect(Http::recorded(static fn (Request $request): bool => str_ends_with($request->url(), '/operations/op1')))->toBeEmpty();
 
+    // In this machine's zone, not in the UTC Brewless gives it in.
+    config(['brewless.timezone' => 'Europe/Amsterdam']);
+
     $this->artisan('storage:status', ['environment' => 'production'])
-        ->expectsOutputToContain('Copy into the bucket of production, started 2026-10-29T12:00:00Z by Ada')
+        ->expectsOutputToContain('Copy into the bucket of production, started 2026-10-29 13:00:00 by Ada')
         ->expectsOutputToContain('1,200 of 5,000 files, 2.0 GB of 9.0 GB, about 1 min to go')
         ->assertSuccessful();
 });

@@ -4,6 +4,14 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org): from 1.0 on, the way a command
 behaves only changes in a major version.
 
+## Unreleased
+
+- `cancel <environment>` stops the release that is under way, after asking (`--yes` to skip). Before, a release that hung could only be stopped in the console, and every deploy was refused until then. A release that waits is cancelled at once; one at work on a step finishes it first.
+- `deploy` cancels the release it started when its run is stopped (SIGTERM, which a pipeline sends when you stop the run). Before, the pipeline said it stopped while the release went on. Ctrl-C still only stops following, and now says how to cancel.
+- `releases` shows the step the release under way is at and what it waits for ("The release container is still rolling out."), which before only the console showed.
+- `releases`, `storage:status` and `db:import-status` show times in this machine's zone (TZ, else the system's), and `releases` names the zone. Before they showed Brewless's UTC, which reads an hour off next to a clock in Amsterdam.
+- Needs Brewless with the cancel route for releases (BL-257).
+
 ## 1.1.0 (2026-11-05)
 
 - `edge:rotate-secret <environment>` replaces the secret with which the edge proves to your containers that a request came through it. The containers hold the new secret and the one before it until the edge has moved over, so the site keeps answering throughout; it takes two releases of the image that is live. Needs `brewless/laravel` 1.2 or later in the application, and says so when it is older instead of replacing the secret.

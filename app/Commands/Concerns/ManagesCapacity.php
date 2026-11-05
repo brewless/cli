@@ -8,7 +8,6 @@ use App\Support\Api;
 use App\Support\ApiException;
 use Carbon\CarbonImmutable;
 use Carbon\Exceptions\InvalidFormatException;
-use DateTimeZone;
 use Exception;
 use Illuminate\Support\Sleep;
 use RuntimeException;
@@ -27,6 +26,8 @@ use function is_string;
  */
 trait ManagesCapacity
 {
+    use ShowsLocalTimes;
+
     /** What each step of a capacity change says once it is done. */
     private const array CAPACITY_STEPS = [
         'apply' => 'New bounds sent to Scaleway',
@@ -166,28 +167,6 @@ trait ManagesCapacity
     protected function euros(int $cents): string
     {
         return '€'.number_format($cents / 100, 2);
-    }
-
-    /**
-     * The zone the person at this machine reads the clock in: TZ when it is
-     * set, else the zone of the system, else PHP's own.
-     */
-    protected function localZone(): DateTimeZone
-    {
-        $candidates = [config('brewless.timezone')];
-        $link = @readlink('/etc/localtime');
-
-        if (is_string($link) && preg_match('~zoneinfo/(.+)$~', $link, $match) === 1) {
-            $candidates[] = $match[1];
-        }
-
-        foreach ($candidates as $candidate) {
-            if (is_string($candidate) && $candidate !== '' && in_array(ltrim($candidate, ':'), DateTimeZone::listIdentifiers(), true)) {
-                return new DateTimeZone(ltrim($candidate, ':'));
-            }
-        }
-
-        return new DateTimeZone(date_default_timezone_get());
     }
 
     protected function localNow(): CarbonImmutable

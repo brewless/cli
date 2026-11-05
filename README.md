@@ -57,6 +57,7 @@ brewless provision production # sets one environment up later, or again after so
 brewless deploy production   # build the current commit and put it live
 brewless releases production # what was deployed
 brewless rollback production # put the previous release back
+brewless cancel production   # stop the release that is under way
 brewless service:push production gliner # build a service of brewless.yml with Docker and put it live
 brewless edge:rotate-secret production # replace the secret the edge proves itself with
 brewless export production   # everything Brewless knows, as a folder with Terraform
