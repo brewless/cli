@@ -58,9 +58,32 @@ brewless deploy production   # build the current commit and put it live
 brewless releases production # what was deployed
 brewless rollback production # put the previous release back
 brewless service:push production gliner # build a service of brewless.yml with Docker and put it live
+brewless edge:rotate-secret production # replace the secret the edge proves itself with
 brewless export production   # everything Brewless knows, as a folder with Terraform
 brewless detach production   # Brewless stops managing it; it keeps running
 ```
+
+### The edge secret
+
+With that secret the edge proves to your containers that a request came
+through it; without it they believe neither the hostname of the visitor nor
+their address. Brewless makes it when it sets an environment up and you never
+see it, so there is usually no reason to touch it.
+
+```bash
+brewless edge:rotate-secret production
+```
+
+Replace it if it may have been seen by someone else. It lives on two sides
+that cannot change at the same moment — a rule at the edge and a variable on
+your containers — so your containers hold the new secret and the one before
+it until the edge has moved over. That takes two releases, which put the image
+that is live now live again: nothing is built, nothing is rolled back, and
+your site keeps answering throughout. Each of those releases empties the edge
+cache, as every release does.
+
+It needs `brewless/laravel` 1.2 or later in the application; an older version
+holds one secret at a time, and the command says so instead of replacing it.
 
 ### Files from another S3 bucket
 
