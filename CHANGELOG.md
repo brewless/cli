@@ -4,13 +4,14 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org): from 1.0 on, the way a command
 behaves only changes in a major version.
 
-## Unreleased
+## 1.2.0 (2026-11-05)
 
 - `cancel <environment>` stops the release that is under way, after asking (`--yes` to skip). Before, a release that hung could only be stopped in the console, and every deploy was refused until then. A release that waits is cancelled at once; one at work on a step finishes it first.
 - `deploy` cancels the release it started when its run is stopped (SIGTERM, which a pipeline sends when you stop the run). Before, the pipeline said it stopped while the release went on. Ctrl-C still only stops following, and now says how to cancel.
 - `releases` shows the step the release under way is at and what it waits for ("The release container is still rolling out."), which before only the console showed.
 - `releases`, `storage:status` and `db:import-status` show times in this machine's zone (TZ, else the system's), and `releases` names the zone. Before they showed Brewless's UTC, which reads an hour off next to a clock in Amsterdam.
-- Needs Brewless with the cancel route for releases (BL-257).
+- `deploy` and the other commands that follow a release have lines for the steps of the realtime server (BL-61).
+- `wakes <environment>` lists the addresses that reached the web container over the last 24 hours, read from bunny.net's request log: what the edge did not answer itself, most first, with the cache status. It is what keeps a serverless container awake. Of a query string only the names are shown.
 
 ## 1.1.0 (2026-11-05)
 
