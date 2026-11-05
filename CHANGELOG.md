@@ -6,7 +6,7 @@ behaves only changes in a major version.
 
 ## 1.1.0 (2026-11-05)
 
-- `edge:rotate-secret <environment>` replaces the secret with which the edge proves to your containers that a request came through it. The containers hold the new secret and the one before it until the edge has moved over, so the site keeps answering throughout; it takes two releases of the image that is live. Needs `brewless/laravel` 1.1 or later in the application, and says so when it is older instead of replacing the secret.
+- `edge:rotate-secret <environment>` replaces the secret with which the edge proves to your containers that a request came through it. The containers hold the new secret and the one before it until the edge has moved over, so the site keeps answering throughout; it takes two releases of the image that is live. Needs `brewless/laravel` 1.2 or later in the application, and says so when it is older instead of replacing the secret.
 
 ## 1.0.0 (2026-11-04)
 

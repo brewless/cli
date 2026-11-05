@@ -82,7 +82,7 @@ that is live now live again: nothing is built, nothing is rolled back, and
 your site keeps answering throughout. Each of those releases empties the edge
 cache, as every release does.
 
-It needs `brewless/laravel` 1.1 or later in the application; an older version
+It needs `brewless/laravel` 1.2 or later in the application; an older version
 holds one secret at a time, and the command says so instead of replacing it.
 
 ### Files from another S3 bucket

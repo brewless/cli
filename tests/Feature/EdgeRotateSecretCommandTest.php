@@ -25,7 +25,7 @@ function rotationOperation(string $status = 'succeeded'): array
         'steps' => $steps,
         'result' => $status === 'succeeded' ? ['revision' => 2, 'retired' => 1] : [],
         'error_message' => $status === 'failed'
-            ? 'The application cannot hold two edge secrets at once, so replacing the secret would leave it answering as the wrong host from the moment the edge moved. Update brewless/laravel to 1.1 or later, deploy, and try again.'
+            ? 'The application cannot hold two edge secrets at once, so replacing the secret would leave it answering as the wrong host from the moment the edge moved. Update brewless/laravel to 1.2 or later, deploy, and try again.'
             : null,
     ];
 }
