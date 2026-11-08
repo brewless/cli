@@ -4,6 +4,10 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org): from 1.0 on, the way a command
 behaves only changes in a major version.
 
+## Unreleased
+
+- `wakes <environment>` names the pages the edge took from your storage zone with `edge.keep_pages` apart from the requests that reached the container. bunny.net logs such a page as a `MISS`, so before this they were counted as the container's, and on a site of a few hundred pages that was most of the figure. It also says when your page store holds more folders than Brewless reads at once, because the count then reads high.
+
 ## 1.2.0 (2026-11-05)
 
 - `cancel <environment>` stops the release that is under way, after asking (`--yes` to skip). Before, a release that hung could only be stopped in the console, and every deploy was refused until then. A release that waits is cancelled at once; one at work on a step finishes it first.

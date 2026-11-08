@@ -66,6 +66,14 @@ final class WakesCommand extends Command
                 $this->line('  <fg=gray>'.number_format((int) $wakers['storage_requests']).' requests for built and versioned files went to your storage zone instead; they do not wake the container.</>');
             }
 
+            if ((int) ($wakers['page_requests'] ?? 0) > 0) {
+                $this->line('  <fg=gray>'.number_format((int) $wakers['page_requests']).' requests were pages the edge took from your storage zone (edge.keep_pages), so they never reached the container.</>');
+            }
+
+            if (($wakers['pages_known'] ?? true) === false) {
+                $this->line('  <fg=gray>Your storage zone holds more folders of pages than are read at once, so some pages may still be counted above as if the container answered them.</>');
+            }
+
             $this->line('  <fg=gray>Of a query string only the names are shown. Read from bunny.net\'s log, which keeps three days; nothing is asked of the container.</>');
 
             return self::SUCCESS;

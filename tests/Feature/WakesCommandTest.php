@@ -47,3 +47,28 @@ test('a log that cannot be read says why', function (): void {
         ->expectsOutputToContain('Logging is off for this pull zone at bunny.net')
         ->assertFailed();
 });
+
+test('pages the edge took from the storage zone are named apart (BL-271)', function (): void {
+    signedIn();
+    project();
+
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env1/wakers' => Http::response(['data' => [
+            'hours' => 24,
+            'origin_requests' => 615,
+            'storage_requests' => 0,
+            'page_requests' => 6186,
+            'pages_known' => false,
+            'complete' => true,
+            'paths' => [['path' => '/mcp', 'requests' => 48, 'statuses' => ['-' => 48]]],
+            'unavailable' => null,
+        ]]),
+    ]);
+
+    $this->artisan('wakes', ['environment' => 'production'])
+        ->expectsOutputToContain('615 requests reached the web container of production')
+        ->expectsOutputToContain('6,186 requests were pages the edge took from your storage zone (edge.keep_pages)')
+        ->expectsOutputToContain('more folders of pages than are read at once')
+        ->assertSuccessful();
+});
