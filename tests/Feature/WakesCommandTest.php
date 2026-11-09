@@ -72,3 +72,25 @@ test('pages the edge took from the storage zone are named apart (BL-271)', funct
         ->expectsOutputToContain('more folders of pages than are read at once')
         ->assertSuccessful();
 });
+
+test('a pull zone that does not take versioned files from the storage zone is said so (BL-274)', function (): void {
+    signedIn();
+    project();
+
+    Http::fake([
+        '*/cli/api/applications' => Http::response(applications()),
+        '*/environments/env1/wakers' => Http::response(['data' => [
+            'hours' => 24,
+            'origin_requests' => 2384,
+            'storage_requests' => 3172,
+            'versioned_from_storage' => false,
+            'complete' => true,
+            'paths' => [['path' => '/mcp', 'requests' => 60, 'statuses' => ['-' => 60]]],
+            'unavailable' => null,
+        ]]),
+    ]);
+
+    $this->artisan('wakes', ['environment' => 'production'])
+        ->expectsOutputToContain('not taking the files your pages ask for with a version (?v=)')
+        ->assertSuccessful();
+});

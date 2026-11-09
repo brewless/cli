@@ -6,6 +6,7 @@ behaves only changes in a major version.
 
 ## Unreleased
 
+- `wakes <environment>` says when your pull zone is not taking the files your pages ask for with a version (`?v=`) from your storage zone. Your container then serves all of them, which is what the figure above the table counts, and nothing said so before.
 - `wakes <environment>` names the pages the edge took from your storage zone with `edge.keep_pages` apart from the requests that reached the container. bunny.net logs such a page as a `MISS`, so before this they were counted as the container's, and on a site of a few hundred pages that was most of the figure. It also says when your page store holds more folders than Brewless reads at once, because the count then reads high.
 
 ## 1.2.0 (2026-11-05)

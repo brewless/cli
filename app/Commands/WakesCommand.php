@@ -70,6 +70,10 @@ final class WakesCommand extends Command
                 $this->line('  <fg=gray>'.number_format((int) $wakers['page_requests']).' requests were pages the edge took from your storage zone (edge.keep_pages), so they never reached the container.</>');
             }
 
+            if (($wakers['versioned_from_storage'] ?? true) === false) {
+                $this->line('  <fg=gray>Your pull zone is not taking the files your pages ask for with a version (?v=) from your storage zone, so your container serves every one of them and they are counted above.</>');
+            }
+
             if (($wakers['pages_known'] ?? true) === false) {
                 $this->line('  <fg=gray>Your storage zone holds more folders of pages than are read at once, so some pages may still be counted above as if the container answered them.</>');
             }
