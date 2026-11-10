@@ -63,15 +63,15 @@ final class WakesCommand extends Command
             }
 
             if ((int) ($wakers['storage_requests'] ?? 0) > 0) {
-                $this->line('  <fg=gray>'.number_format((int) $wakers['storage_requests']).' requests for built and versioned files went to your storage zone instead; they do not wake the container.</>');
+                $this->line('  <fg=gray>'.number_format((int) $wakers['storage_requests']).' requests for built files went to your storage zone instead; they do not wake the container.</>');
             }
 
             if ((int) ($wakers['page_requests'] ?? 0) > 0) {
                 $this->line('  <fg=gray>'.number_format((int) $wakers['page_requests']).' requests were pages the edge took from your storage zone (edge.keep_pages), so they never reached the container.</>');
             }
 
-            if (($wakers['versioned_from_storage'] ?? true) === false) {
-                $this->line('  <fg=gray>Your pull zone is not taking the files your pages ask for with a version (?v=) from your storage zone, so your container serves every one of them and they are counted above.</>');
+            if ((int) ($wakers['versioned_requests'] ?? 0) > 0) {
+                $this->line('  <fg=gray>'.number_format((int) $wakers['versioned_requests']).' of the requests above asked for a file with a version (?v=). bunny.net\'s log does not say whether your storage zone or your container answered those, so they are counted as your container\'s.</>');
             }
 
             if (($wakers['pages_known'] ?? true) === false) {
