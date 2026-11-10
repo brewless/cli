@@ -8,6 +8,7 @@ behaves only changes in a major version.
 
 - `wakes <environment>` counts a file asked for with a version (`?v=`) towards your container, and says how many of the requests those were. Your pull zone has a rule that should take them from your storage zone, but bunny.net's log does not say which origin answered a request, so the rule being there is no proof it fired. Before this they were left out of the figure above the table.
 - `wakes <environment>` names the pages the edge took from your storage zone with `edge.keep_pages` apart from the requests that reached the container. bunny.net logs such a page as a `MISS`, so before this they were counted as the container's, and on a site of a few hundred pages that was most of the figure. It also says when your page store holds more folders than Brewless reads at once, because the count then reads high.
+- `plan` marks the settings of a service (`services.<name>.*` in `brewless.yml`, such as `min`, `max` and the new `concurrency`) as applied by `brewless service:push` instead of "not applied by a deploy yet". The README names the scaling keys of a service. Both need Brewless with service scaling.
 
 ## 1.2.0 (2026-11-05)
 
@@ -115,10 +116,6 @@ behaves only changes in a major version.
 ## 0.13.1 (2026-10-24)
 
 - `deploy` and `rollback` keep following the release when Brewless briefly answers with a server error or cannot be reached, as can happen while a new version goes live. After two minutes without an answer they stop and say that the release goes on at Brewless. A refusal, such as a revoked token, still stops them at once.
-
-## Unreleased
-
-- `plan` marks the settings of a service (`services.<name>.*` in `brewless.yml`, such as `min`, `max` and the new `concurrency`) as applied by `brewless service:push` instead of "not applied by a deploy yet". The README names the scaling keys of a service. Both need Brewless with service scaling.
 
 ## 0.13.0 (2026-10-24)
 
