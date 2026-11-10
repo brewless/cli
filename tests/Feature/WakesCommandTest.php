@@ -30,7 +30,7 @@ test('wakes lists what reached the container, most first', function (): void {
             ['/contact', '34', 'no cache 34'],
         ])
         ->expectsOutputToContain('counted from the newest')
-        ->expectsOutputToContain('12 requests for built and versioned files went to your storage zone instead')
+        ->expectsOutputToContain('12 requests for built files went to your storage zone instead')
         ->assertSuccessful();
 });
 
@@ -73,7 +73,7 @@ test('pages the edge took from the storage zone are named apart (BL-271)', funct
         ->assertSuccessful();
 });
 
-test('a pull zone that does not take versioned files from the storage zone is said so (BL-274)', function (): void {
+test('requests for a file with a version say the log cannot place them (BL-274)', function (): void {
     signedIn();
     project();
 
@@ -83,7 +83,7 @@ test('a pull zone that does not take versioned files from the storage zone is sa
             'hours' => 24,
             'origin_requests' => 2384,
             'storage_requests' => 3172,
-            'versioned_from_storage' => false,
+            'versioned_requests' => 412,
             'complete' => true,
             'paths' => [['path' => '/mcp', 'requests' => 60, 'statuses' => ['-' => 60]]],
             'unavailable' => null,
@@ -91,6 +91,6 @@ test('a pull zone that does not take versioned files from the storage zone is sa
     ]);
 
     $this->artisan('wakes', ['environment' => 'production'])
-        ->expectsOutputToContain('not taking the files your pages ask for with a version (?v=)')
+        ->expectsOutputToContain('412 of the requests above asked for a file with a version (?v=)')
         ->assertSuccessful();
 });
