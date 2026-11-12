@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Commands;
 
+use App\Commands\Concerns\ShowsLocalTimes;
 use App\Commands\Concerns\TalksToBrewless;
+use Carbon\CarbonImmutable;
 use LaravelZero\Framework\Commands\Command;
 
 final class DomainCheckCommand extends Command
 {
+    use ShowsLocalTimes;
     use TalksToBrewless;
 
     protected $signature = 'domain:check {environment : The environment the domain belongs to}
@@ -52,6 +55,12 @@ final class DomainCheckCommand extends Command
             if (($domain['status'] ?? '') !== 'active' && ($domain['reason'] ?? null) !== 'certificate_pending') {
                 $this->line('    Wanted: '.($record['type'] ?? '').'  '.($record['name'] ?? $hostname).'  ->  '.($record['value'] ?? '?'));
                 $this->line('    Found:  '.(is_string($domain['found'] ?? null) ? $domain['found'] : 'nothing'));
+            }
+
+            // A check by hand keeps Brewless looking every quarter of an hour for two hours, until the record is found.
+            if (is_string($domain['manual_until'] ?? null) && $domain['manual_until'] !== '' && ($domain['status'] ?? '') !== 'active' && ($domain['reason'] ?? null) !== 'certificate_pending') {
+                $until = CarbonImmutable::parse($domain['manual_until'])->setTimezone($this->localZone());
+                $this->line('    Brewless looks again every 15 minutes until '.$until->format('H:i').' ('.$until->getTimezone()->getName().'), and stops as soon as it finds the record.');
             }
 
             return self::SUCCESS;
