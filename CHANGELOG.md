@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org): from 1.0 on, the way a command
 behaves only changes in a major version.
 
-## Unreleased
+## 1.3.0 (2026-11-12)
 
 - `domain:check <environment> <hostname>` says until when Brewless keeps looking: a check by hand makes it look again every 15 minutes for two hours, until it finds the record, and the line says the time in this machine's zone. Needs Brewless with the quarter-hour looks; with an older one the line is left out.
 - `wakes <environment>` counts a file asked for with a version (`?v=`) towards your container, and says how many of the requests those were. Your pull zone has a rule that should take them from your storage zone, but bunny.net's log does not say which origin answered a request, so the rule being there is no proof it fired. Before this they were left out of the figure above the table.
