@@ -39,8 +39,11 @@ final class DomainListCommand extends Command
 
             $domains = is_array($answer['domains'] ?? null) ? $answer['domains'] : [];
 
+            $mail = is_array($answer['mail'] ?? null) ? $answer['mail'] : null;
+
             if ($domains === []) {
                 $this->components->info($this->argument('environment').' has no domain of its own yet. Add one with: brewless domain:add '.$this->argument('environment').' shop.example.eu');
+                $this->mailRecords($mail);
 
                 return self::SUCCESS;
             }
@@ -55,6 +58,8 @@ final class DomainListCommand extends Command
             foreach ($domains as $domain) {
                 $this->keptElsewhere(is_array($domain['tracked'] ?? null) ? $domain['tracked'] : null);
             }
+
+            $this->mailRecords($mail);
 
             return self::SUCCESS;
         });
@@ -94,6 +99,34 @@ final class DomainListCommand extends Command
 
         if (($tracked['status'] ?? '') === 'failed') {
             $this->line('    Brewless stopped waiting. Make the record, then run: brewless domain:check '.$this->argument('environment').' '.$tracked['hostname']);
+        }
+    }
+
+    /**
+     * The records mail needs, when the zone of the domain it is sent from is
+     * kept elsewhere too: each in full, with whether the mailer found it.
+     *
+     * @param  array<string, mixed>|null  $mail
+     */
+    private function mailRecords(?array $mail): void
+    {
+        if ($mail === null || ($mail['kept_elsewhere'] ?? false) !== true) {
+            return;
+        }
+
+        $mailer = ($mail['provider'] ?? '') === 'lettermint' ? 'Lettermint' : 'Transactional Email';
+        $records = array_values(array_filter((array) ($mail['records'] ?? []), is_array(...)));
+        $missing = array_values(array_filter($records, static fn (array $record): bool => ($record['status'] ?? null) !== 'valid'));
+
+        $this->newLine();
+        $this->line('  <options=bold>Mail from '.($mail['domain'] ?? '').'</> ('.$mailer.'): '.($missing === [] ? 'every record found' : count($missing).' of '.count($records).' records not found yet'));
+
+        foreach ($missing as $record) {
+            $this->line('    '.($record['type'] ?? '').'  '.($record['name'] ?? '').'  ->  '.($record['value'] ?? ''));
+        }
+
+        if ($missing !== []) {
+            $this->line('    Made them? Run: brewless mail:records '.$this->argument('environment').' --check');
         }
     }
 }
