@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org): from 1.0 on, the way a command
 behaves only changes in a major version.
 
-## Unreleased
+## 1.4.0 (2026-11-19)
 
 - `mail:records <environment>` lists every DNS record the domain an environment sends mail from needs, at Transactional Email or at Lettermint: the type, the name and the whole value on a line of its own, and whether the mailer found it. `--check` has the mailer look them up now, and Brewless asks it again every 15 minutes for two hours, until it found them all. Needs Brewless with kept mail records (BL-298).
 - `domain:list <environment>` names the mail records still to make when the zone of the sending domain is kept elsewhere.
