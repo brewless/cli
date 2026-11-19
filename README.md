@@ -160,6 +160,18 @@ brewless dns:update example.eu 1234 --value=203.0.113.8 # change what you give, 
 brewless dns:remove example.eu 1234                  # remove a record (asks first; --force to skip)
 ```
 
+### Mail records
+
+The DNS records the domain an environment sends mail from needs, at
+Transactional Email or at Lettermint, with their whole value and whether the
+mailer found them. `--check` has the mailer look them up now, and Brewless
+asks it again every quarter of an hour for two hours, until it found them all.
+
+```bash
+brewless mail:records production            # every record, in full
+brewless mail:records production --check    # have the mailer look now
+```
+
 ## What init asks
 
 `brewless init` writes `brewless.yml` (no secrets) and then asks what the

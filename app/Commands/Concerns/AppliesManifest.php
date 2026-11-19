@@ -135,7 +135,8 @@ trait AppliesManifest
         $elsewhere = array_values(array_filter($missing, static fn (array $record): bool => ($record['in_zone'] ?? false) !== true));
 
         foreach ($elsewhere as $record) {
-            $this->line('  Mail needs a '.($record['type'] ?? 'TXT').' record at <options=bold>'.($record['name'] ?? '').'</>: '.($record['value'] ?? '').'. Add it where the DNS of the domain is kept; mail sends once Scaleway has checked it.');
+            $mailer = ($record['provider'] ?? 'scaleway') === 'lettermint' ? 'Lettermint' : 'Scaleway';
+            $this->line('  Mail needs a '.($record['type'] ?? 'TXT').' record at <options=bold>'.($record['name'] ?? '').'</>: '.($record['value'] ?? '').'. Add it where the DNS of the domain is kept; mail sends once '.$mailer.' has checked it. brewless mail:records '.$slug.' shows them all.');
         }
 
         if ($inZone === []) {
@@ -155,7 +156,7 @@ trait AppliesManifest
         }
 
         $applied = $this->sendManifest($api, $application, $manifest, $slug, mailRecords: true) ?: $applied;
-        $this->line('  Wrote '.count((array) ($applied['mail_records'] ?? [])).' DNS records for mail. Scaleway checks them again; that takes a few minutes.');
+        $this->line('  Wrote '.count((array) ($applied['mail_records'] ?? [])).' DNS records for mail. Brewless has the mailer check them again; that takes a few minutes.');
 
         return $applied;
     }
