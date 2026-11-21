@@ -4,7 +4,7 @@ All notable changes to the Brewless command line client. Versions follow
 [semantic versioning](https://semver.org): from 1.0 on, the way a command
 behaves only changes in a major version.
 
-## Unreleased
+## 1.5.0 (2026-11-21)
 
 - `init` writes the PHP version in the `brewless.yml` of a new application: the newest one Brewless builds, PHP 8.6 today, or the newest your project takes. It reads the `php` requirement of your `composer.json` and of the packages in your `composer.lock` that a build installs, and says which one holds it back (`acme/driver asks for >=8.2 <8.6, so not 8.6`). `--php=` overrules it. For an application that exists already `init` writes no line, so it stays on the version it is built for. Needs Brewless from 21 November 2026 on; an older one names no version and the line is left out, as before.
 - The tests run on PHP 8.4, 8.5 and 8.6, and the built client is started on each of them.
