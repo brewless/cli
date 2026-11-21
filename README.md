@@ -232,10 +232,17 @@ them at the end. `brewless plan` shows the file next to what stands.
 A release is built for the PHP version your `brewless.yml` names:
 
 ```yaml
-php: "8.3"
+php: "8.6"
 ```
 
-Without that line Brewless builds for its default version. The versions it
+Brewless builds for PHP 8.3, 8.4, 8.5 and 8.6. `brewless init` writes the line
+for a new application: the newest version Brewless builds that your project
+takes, read from the `php` requirement in your `composer.json` and in the
+packages of your `composer.lock`. It says so when a package holds it back, and
+`--php=` overrules it. An application that exists already gets no line from
+`init`, so it stays on the version it is built for.
+
+Without the line Brewless builds for its default version, 8.4. The versions it
 can build are listed when you ask for one it cannot.
 
 ## What happens on a deploy

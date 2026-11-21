@@ -728,3 +728,88 @@ test('a key that may not make projects asks nothing about them', function (): vo
 
     Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && str_ends_with($request->url(), '/cli/api/applications') && ! isset($request['project_name']) && ! isset($request['share_project_with']));
 });
+
+/**
+ * An organisation whose control plane names the PHP versions it builds and the one new projects get.
+ */
+function organisationThatNamesPhp(): void
+{
+    Http::fake([
+        '*/cli/api/applications' => fn (Request $request) => $request->method() === 'POST'
+            ? Http::response(['data' => ['id' => 'app9', 'slug' => 'privasearch', 'environments' => []]], 201)
+            : Http::response([...applications(), 'options' => ['php' => ['versions' => ['8.3', '8.4', '8.5', '8.6'], 'default' => '8.4', 'new_projects' => '8.6']]]),
+    ]);
+}
+
+test('a new application is built for the newest PHP version, written in brewless.yml', function (): void {
+    signedIn('acme');
+    organisationThatNamesPhp();
+    file_put_contents($this->project.'/composer.json', json_encode(['require' => ['php' => '^8.3', 'laravel/framework' => '^13.0']]));
+
+    $this->artisan('init', ['--name' => 'PrivaSearch', '--environments' => 'none', '--no-interaction' => true])
+        ->expectsOutputToContain('PHP: 8.6 (the newest Brewless builds; overrule with --php=)')
+        ->assertSuccessful();
+
+    expect(Project::read($this->project)->php)->toBe('8.6')
+        ->and(Yaml::parseFile($this->project.'/brewless.yml')['php'])->toBe('8.6');
+});
+
+test('an application that exists keeps the PHP version it is built for', function (): void {
+    signedIn('acme');
+    organisationThatNamesPhp();
+
+    $this->artisan('init', ['--application' => 'shop', '--environments' => 'none'])->assertSuccessful();
+
+    expect(Project::read($this->project)->php)->toBeNull();
+});
+
+test('--php goes before the newest version', function (): void {
+    signedIn('acme');
+    organisationThatNamesPhp();
+
+    $this->artisan('init', ['--name' => 'PrivaSearch', '--php' => '8.4', '--environments' => 'none', '--no-interaction' => true])->assertSuccessful();
+
+    expect(Project::read($this->project)->php)->toBe('8.4');
+});
+
+test('a control plane that names no PHP version for new projects leaves the line out', function (): void {
+    signedIn('acme');
+    freshOrganisation();
+
+    $this->artisan('init', ['--name' => 'PrivaSearch', '--environments' => 'none', '--no-interaction' => true])->assertSuccessful();
+
+    expect(Project::read($this->project)->php)->toBeNull();
+});
+
+test('a project that does not take the newest PHP version gets the newest one it does take, and is told why', function (): void {
+    signedIn('acme');
+    organisationThatNamesPhp();
+    file_put_contents($this->project.'/composer.json', json_encode(['require' => ['php' => '^8.3', 'laravel/framework' => '^13.0']]));
+    file_put_contents($this->project.'/composer.lock', json_encode([
+        'packages' => [
+            ['name' => 'laravel/framework', 'require' => ['php' => '^8.3']],
+            ['name' => 'acme/old-driver', 'require' => ['php' => '>=8.2 <8.6']],
+            ['name' => 'acme/no-php', 'require' => ['ext-json' => '*']],
+        ],
+        // What only a developer installs does not hold a build back.
+        'packages-dev' => [['name' => 'acme/dev-tool', 'require' => ['php' => '~8.3.0']]],
+    ]));
+
+    $this->artisan('init', ['--name' => 'PrivaSearch', '--environments' => 'none', '--no-interaction' => true])
+        ->expectsOutputToContain('PHP: 8.5 (the newest your project takes: acme/old-driver asks for >=8.2 <8.6, so not 8.6; overrule with --php=)')
+        ->assertSuccessful();
+
+    expect(Project::read($this->project)->php)->toBe('8.5');
+});
+
+test('a project that takes none of the PHP versions gets no line and a warning', function (): void {
+    signedIn('acme');
+    organisationThatNamesPhp();
+    file_put_contents($this->project.'/composer.json', json_encode(['require' => ['php' => '~8.2.0']]));
+
+    $this->artisan('init', ['--name' => 'PrivaSearch', '--environments' => 'none', '--no-interaction' => true])
+        ->expectsOutputToContain('composer.json asks for ~8.2.0')
+        ->assertSuccessful();
+
+    expect(Project::read($this->project)->php)->toBeNull();
+});

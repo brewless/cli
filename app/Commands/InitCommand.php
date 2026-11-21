@@ -9,6 +9,7 @@ use App\Commands\Concerns\TalksToBrewless;
 use App\Support\Api;
 use App\Support\Credentials;
 use App\Support\Framework;
+use App\Support\PhpChoice;
 use App\Support\Project;
 use App\Support\Vapor;
 use Illuminate\Support\Sleep;
@@ -39,7 +40,7 @@ final class InitCommand extends Command
         {--share-project= : For a new application, when the key may make projects: the slug of an application whose Scaleway project it shares, to share a database, cache or mail domain}
         {--project-name= : For a new application, when the key may make projects: the name of its Scaleway project of its own, such as websites}
         {--framework= : laravel, symfony or generic; detected from composer.json when left out}
-        {--php= : The PHP version to build for, such as 8.4; left out, Brewless builds for its default}
+        {--php= : The PHP version to build for, such as 8.6; left out, a new application gets the newest one the project takes and an existing one keeps its own}
         {--environments= : The environments to add, such as production,staging; "none" adds none}
         {--region= : Where new environments stand: fr-par, nl-ams, pl-waw or it-mil}
         {--database= : For every new environment: new, existing or none}
@@ -89,7 +90,9 @@ final class InitCommand extends Command
                 );
             }
 
-            if ($slug === self::NEW_APPLICATION) {
+            $created = $slug === self::NEW_APPLICATION;
+
+            if ($created) {
                 $name = is_string($newName) && $newName !== ''
                     ? $newName
                     : text(label: 'What is the application called?', default: basename($directory), required: true);
@@ -106,6 +109,12 @@ final class InitCommand extends Command
             }
 
             $php = $this->option('php') ?? $vapor?->php;
+
+            // A new application starts on the newest PHP version; one that exists keeps what it is built for.
+            if ($created && ! is_string($php)) {
+                $php = $this->phpForNewApplication($listing['options']['php'] ?? null, $directory);
+            }
+
             $project = new Project($organisation, (string) $slug, $framework, is_string($php) && $php !== '' ? $php : null);
 
             $project->write($directory, $vapor?->manifest($framework) ?? []);
@@ -669,6 +678,38 @@ final class InitCommand extends Command
         $this->line('  Framework: <options=bold>'.$framework.'</>'.($this->option('framework') ? '' : ' (from composer.json; overrule with --framework=)'));
 
         return (string) $framework;
+    }
+
+    /**
+     * The PHP version a new application is built for: the one Brewless names
+     * for new projects, or the newest it builds that the project's
+     * composer.json and composer.lock allow. Written in brewless.yml, so the
+     * application stays on it until the file says otherwise. Null leaves the
+     * line out: a control plane that names no version, or a project that
+     * takes none of them.
+     */
+    private function phpForNewApplication(mixed $offer, string $directory): ?string
+    {
+        $newest = is_array($offer) && is_string($offer['new_projects'] ?? null) ? $offer['new_projects'] : null;
+
+        if ($newest === null) {
+            return null;
+        }
+
+        $versions = array_values(array_filter(is_array($offer['versions'] ?? null) ? $offer['versions'] : [], is_string(...)));
+        $choice = PhpChoice::for($directory, $newest, $versions);
+
+        if ($choice['php'] === null) {
+            $this->components->warn('Brewless builds for PHP '.implode(', ', $versions).', and '.$choice['held_back_by'].' asks for '.$choice['constraint'].'. brewless.yml names no PHP version; set `php` once the project takes one of them.');
+
+            return null;
+        }
+
+        $this->line('  PHP: <options=bold>'.$choice['php'].'</>'.($choice['held_back_by'] === null
+            ? ' (the newest Brewless builds; overrule with --php=)'
+            : ' (the newest your project takes: '.$choice['held_back_by'].' asks for '.$choice['constraint'].', so not '.$newest.'; overrule with --php=)'));
+
+        return $choice['php'];
     }
 
     private function organisation(Credentials $credentials): string
