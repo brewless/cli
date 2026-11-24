@@ -58,12 +58,31 @@ brewless deploy production   # build the current commit and put it live
 brewless releases production # what was deployed
 brewless rollback production # put the previous release back
 brewless cancel production   # stop the release that is under way
+brewless command production "migrate:status" # run one console command and show what it prints
+brewless tinker production "App\\Models\\User::count()" # run a line of PHP with tinker
 brewless wakes production    # what reached the web container over the last day
 brewless service:push production gliner # build a service of brewless.yml with Docker and put it live
 brewless edge:rotate-secret production # replace the secret the edge proves itself with
 brewless export production   # everything Brewless knows, as a folder with Terraform
 brewless detach production   # Brewless stops managing it; it keeps running
 ```
+
+### A line of PHP
+
+`tinker` runs PHP in an environment's own container, on the live release,
+next to its database, and prints what tinker prints: the value of the last
+expression, or the exception. It ends with tinker's exit code, 1 when the code
+threw. On production it shows the code and asks first; `--force` skips that.
+
+```bash
+brewless tinker staging "App\\Models\\User::where('email', 'ada@example.com')->first()?->name"
+brewless tinker production "config('queue.default')"
+```
+
+It has the same 50 seconds as `command`; longer work belongs in a queued job.
+Brewless passes the code on and keeps neither it nor the output: the audit
+trail says that tinker ran, not what. It needs `brewless/laravel` 1.11 or
+later in the application, and `laravel/tinker` in its `require`.
 
 ### The edge secret
 
